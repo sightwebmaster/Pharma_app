@@ -16,7 +16,7 @@
     <groupId>com.pharma</groupId>
     <artifactId>api-gateway</artifactId>
     <version>1.0.0</version>
-    <n>api-gateway</n>
+    <name>api-gateway</name>
     <description>API Gateway — Point d'entrée unique pour Flutter</description>
 
     <properties>

@@ -30,6 +30,7 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // ── Endpoints publics ────────────────────────────────────
+                .requestMatchers("/api/users/register").permitAll()   // ← Inscription
                 .requestMatchers("/api/users/internal/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 // ── Tout le reste nécessite un JWT Keycloak valide ───────
@@ -42,15 +43,13 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /**
-     * CORS — autorise les appels depuis :
-     *   - Flutter Web (Chrome) : http://localhost:*
-     *   - Flutter Mobile via Gateway : n'est pas limité ici
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("http://localhost:*", "http://10.0.2.2:*"));
+        config.setAllowedOriginPatterns(List.of(
+            "http://localhost:*",
+            "http://10.0.2.2:*"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -61,10 +60,6 @@ public class SecurityConfig {
         return source;
     }
 
-    /**
-     * Convertit les rôles Keycloak (realm_access.roles)
-     * en authorities Spring Security ROLE_PATIENT / ROLE_PHARMACIEN / ROLE_ADMIN
-     */
     @Bean
     public JwtAuthenticationConverter keycloakConverter() {
         var converter = new JwtAuthenticationConverter();

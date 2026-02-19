@@ -22,6 +22,34 @@ public class UserController {
     private final UserService userService;
 
     // ═══════════════════════════════════════════════════════════════════════
+    //  INSCRIPTION PUBLIQUE — Pas de JWT requis
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * POST /api/users/register
+     * Crée un compte dans Keycloak depuis le backend (pas de CORS).
+     * Accessible sans token JWT (permitAll dans SecurityConfig).
+     */
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, String>> register(
+            @RequestBody RegisterRequest req) {
+        try {
+            userService.registerUser(req);
+            return ResponseEntity.ok(Map.of("message", "Compte créé avec succès"));
+        } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            // Email déjà utilisé → Keycloak retourne 409
+            if (msg.contains("409") || msg.contains("KEYCLOAK_409")) {
+                return ResponseEntity.status(409)
+                    .body(Map.of("error", "Email déjà utilisé"));
+            }
+            log.error("Erreur register: {}", msg);
+            return ResponseEntity.status(500)
+                .body(Map.of("error", "Erreur serveur: " + msg));
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     //  SCRUM-2 / SCRUM-11 — Sync après login Keycloak
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -50,7 +78,6 @@ public class UserController {
 
     /**
      * GET /api/users/me
-     * Retourne le profil de l'utilisateur connecté.
      */
     @GetMapping("/me")
     public ResponseEntity<UserDTO> getProfile(Authentication auth) {
@@ -59,7 +86,6 @@ public class UserController {
 
     /**
      * PUT /api/users/me
-     * Met à jour le profil (prénom, nom, téléphone, date de naissance).
      */
     @PutMapping("/me")
     public ResponseEntity<UserDTO> updateProfile(
@@ -70,7 +96,6 @@ public class UserController {
 
     /**
      * PUT /api/users/me/fcm-token
-     * Enregistre le token Firebase pour les notifications push (Sprint 3).
      */
     @PutMapping("/me/fcm-token")
     public ResponseEntity<Void> updateFcmToken(
@@ -84,20 +109,12 @@ public class UserController {
     //  SCRUM-2 — Profil médical : Allergies
     // ═══════════════════════════════════════════════════════════════════════
 
-    /**
-     * GET /api/users/me/allergies
-     * Retourne la liste des allergies du patient connecté.
-     */
     @GetMapping("/me/allergies")
     @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<List<AllergyDTO>> getAllergies(Authentication auth) {
         return ResponseEntity.ok(userService.getAllergies(auth));
     }
 
-    /**
-     * POST /api/users/me/allergies
-     * Ajoute une allergie au profil médical du patient.
-     */
     @PostMapping("/me/allergies")
     @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<AllergyDTO> addAllergy(
@@ -108,10 +125,6 @@ public class UserController {
             .body(userService.addAllergy(req, auth));
     }
 
-    /**
-     * DELETE /api/users/me/allergies/{id}
-     * Supprime une allergie du profil médical du patient.
-     */
     @DeleteMapping("/me/allergies/{id}")
     @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<Void> removeAllergy(
@@ -125,30 +138,18 @@ public class UserController {
     //  SCRUM-17 — Admin : gérer les comptes pharmaciens
     // ═══════════════════════════════════════════════════════════════════════
 
-    /**
-     * GET /api/users/pharmaciens
-     * Liste tous les pharmaciens (accès ADMIN uniquement).
-     */
     @GetMapping("/pharmaciens")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserDTO>> getAllPharmaciens() {
         return ResponseEntity.ok(userService.getAllPharmaciens());
     }
 
-    /**
-     * GET /api/users/patients
-     * Liste tous les patients (accès PHARMACIEN ou ADMIN).
-     */
     @GetMapping("/patients")
     @PreAuthorize("hasAnyRole('PHARMACIEN','ADMIN')")
     public ResponseEntity<List<UserDTO>> getAllPatients() {
         return ResponseEntity.ok(userService.getAllPatients());
     }
 
-    /**
-     * DELETE /api/users/{id}
-     * Supprime un compte utilisateur (accès ADMIN uniquement).
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
@@ -157,14 +158,9 @@ public class UserController {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  ENDPOINTS INTERNES (inter-services, pas derrière la gateway auth)
+    //  ENDPOINTS INTERNES
     // ═══════════════════════════════════════════════════════════════════════
 
-    /**
-     * GET /api/users/internal/{keycloakId}
-     * Utilisé par medication-service / recommendation-service (Sprint 2).
-     * Pas d'auth requise car appelé de service à service en interne.
-     */
     @GetMapping("/internal/{keycloakId}")
     public ResponseEntity<UserDTO> getByKeycloakId(@PathVariable String keycloakId) {
         return userService.getInternalUser(keycloakId)

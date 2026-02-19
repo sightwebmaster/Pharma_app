@@ -4,7 +4,7 @@ import 'auth_service.dart';
 class ApiService {
   // Passe par l'API Gateway sur le port 8000
   // 10.0.2.2 = localhost du PC vu depuis l'émulateur Android
-  static const String _baseUrl = 'http://10.0.2.2:8000';
+  static const String _baseUrl = 'http://localhost:8000';
 
   static final Dio _dio = Dio(BaseOptions(
     baseUrl: _baseUrl,

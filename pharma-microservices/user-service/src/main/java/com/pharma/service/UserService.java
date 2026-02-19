@@ -6,13 +6,16 @@ import com.pharma.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,8 +24,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserService {
 
-    private final UserRepository       userRepository;
-    private final AllergyRepository    allergyRepository;
+    private final UserRepository         userRepository;
+    private final AllergyRepository      allergyRepository;
     private final FamilyMemberRepository familyMemberRepository;
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -36,7 +39,6 @@ public class UserService {
     public UserDTO createOrUpdateUser(String keycloakId, String email, String role) {
         return userRepository.findByKeycloakId(keycloakId)
             .map(existing -> {
-                // Mettre à jour l'email si changé dans Keycloak
                 if (!existing.getEmail().equals(email)) {
                     existing.setEmail(email);
                     userRepository.save(existing);
@@ -53,6 +55,113 @@ public class UserService {
                     .build();
                 return UserDTO.from(userRepository.save(user));
             });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  INSCRIPTION — Création compte Keycloak depuis le backend
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Crée un utilisateur dans Keycloak via l'API Admin,
+     * puis lui assigne le rôle choisi (PATIENT ou PHARMACIEN).
+     * Appelé depuis POST /api/users/register (endpoint public).
+     */
+    public void registerUser(RegisterRequest req) {
+        try {
+            String adminToken = getAdminToken();
+            String userId     = createKeycloakUser(adminToken, req);
+            assignRole(adminToken, userId, req.getRole());
+            log.info("Utilisateur inscrit avec succès: {} role={}", req.getEmail(), req.getRole());
+        } catch (HttpClientErrorException e) {
+            log.error("Keycloak error [{}]: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("KEYCLOAK_" + e.getStatusCode().value() + ": " + e.getResponseBodyAsString());
+        } catch (Exception e) {
+            log.error("Erreur inscription: {}", e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+
+    // ── Obtenir le token admin depuis le realm master ────────────────────
+    private String getAdminToken() {
+        RestTemplate rt = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("grant_type", "password");
+        body.add("client_id",  "admin-cli");
+        body.add("username",   "admin");
+        body.add("password",   "admin"); // ← mot de passe admin Keycloak
+
+        ResponseEntity<Map> resp = rt.exchange(
+            "http://localhost:8080/realms/master/protocol/openid-connect/token",
+            HttpMethod.POST,
+            new HttpEntity<>(body, headers),
+            Map.class
+        );
+
+        return (String) Objects.requireNonNull(resp.getBody()).get("access_token");
+    }
+
+    // ── Créer l'utilisateur dans Keycloak ────────────────────────────────
+    // Retourne le userId Keycloak (extrait du header Location de la réponse)
+    private String createKeycloakUser(String adminToken, RegisterRequest req) {
+        RestTemplate rt = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(adminToken);
+
+        Map<String, Object> user = new HashMap<>();
+        user.put("username",      req.getEmail());
+        user.put("email",         req.getEmail());
+        user.put("firstName",     req.getFirstName());
+        user.put("lastName",      req.getLastName());
+        user.put("enabled",       true);
+        user.put("emailVerified", true);
+        user.put("credentials",   List.of(Map.of(
+            "type",      "password",
+            "value",     req.getPassword(),
+            "temporary", false
+        )));
+        user.put("attributes", Map.of(
+            "phoneNumber", List.of(req.getPhoneNumber() != null ? req.getPhoneNumber() : ""),
+            "address",     List.of(req.getAddress()     != null ? req.getAddress()     : "")
+        ));
+
+        ResponseEntity<Void> resp = rt.exchange(
+            "http://localhost:8080/admin/realms/pharma-app/users",
+            HttpMethod.POST,
+            new HttpEntity<>(user, headers),
+            Void.class
+        );
+
+        String location = resp.getHeaders().getFirst("Location");
+        if (location == null) throw new RuntimeException("Location header manquant");
+        return location.substring(location.lastIndexOf("/") + 1);
+    }
+
+    // ── Assigner le rôle realm à l'utilisateur ──────────────────────────
+    private void assignRole(String adminToken, String userId, String roleName) {
+        RestTemplate rt = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+
+        // 1. Récupérer la représentation du rôle
+        ResponseEntity<Map> roleResp = rt.exchange(
+            "http://localhost:8080/admin/realms/pharma-app/roles/" + roleName,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            Map.class
+        );
+
+        // 2. Assigner le rôle
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        rt.exchange(
+            "http://localhost:8080/admin/realms/pharma-app/users/" + userId + "/role-mappings/realm",
+            HttpMethod.POST,
+            new HttpEntity<>(List.of(roleResp.getBody()), headers),
+            Void.class
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -26,6 +26,7 @@ public class GatewaySecurityConfig {
                 .pathMatchers("/actuator/**").permitAll()
                 .pathMatchers("/api/public/**").permitAll()
                 .pathMatchers("/api/users/internal/**").permitAll()
+                .pathMatchers("/api/users/register").permitAll()  // ← INSCRIPTION
 
                 // ── Tout le reste nécessite un JWT Keycloak valide ─────────
                 .anyExchange().authenticated()
@@ -39,10 +40,6 @@ public class GatewaySecurityConfig {
         return http.build();
     }
 
-    /**
-     * Convertit les rôles Keycloak (realm_access.roles)
-     * en GrantedAuthorities Spring Security : ROLE_PATIENT, ROLE_PHARMACIEN, ROLE_ADMIN
-     */
     private ReactiveJwtAuthenticationConverter keycloakConverter() {
         var converter = new ReactiveJwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {

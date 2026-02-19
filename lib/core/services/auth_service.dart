@@ -8,7 +8,7 @@ class AuthService {
   // Vrai téléphone     → IP du PC ex: 192.168.1.50
   // iOS Simulator      → localhost
   // ─────────────────────────────────────────────────────────────────────────────
-  static const String _host = '10.0.2.2';
+  static const String _host = 'localhost';
   static const String _tokenUrl =
       'http://$_host:8080/realms/pharma-app/protocol/openid-connect/token';
   static const String _clientId = 'pharma-mobile';

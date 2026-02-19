@@ -1,8 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/api_service.dart';
+import '../../widgets/custom_button.dart';
+import '../../widgets/custom_textfield.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -12,256 +17,419 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _emailCtrl    = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  bool _isLoading   = false;
-  bool _obscurePass  = true;
+  final _formKey                   = GlobalKey<FormState>();
+  final _nomController             = TextEditingController();
+  final _prenomController          = TextEditingController();
+  final _emailController           = TextEditingController();
+  final _passwordController        = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _telephoneController       = TextEditingController();
+  final _adresseController         = TextEditingController();
+
+  String? _selectedRole;
+  bool _isLoading              = false;
+  bool _obscurePassword        = true;
+  bool _obscureConfirmPassword = true;
+
+  final List<String> _roles = [AppStrings.patient, AppStrings.pharmacien];
+
+  // ── URL du backend (passe par l'API Gateway) ──────────────────────────
+  // localhost → navigateur web
+  // 10.0.2.2  → émulateur Android
+  static const String _baseUrl = 'http://localhost:8000';
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
+    _nomController.dispose();
+    _prenomController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _telephoneController.dispose();
+    _adresseController.dispose();
     super.dispose();
   }
 
-  // Après inscription manuelle dans Keycloak, l'utilisateur entre ses identifiants ici
-  Future<void> _handleFirstLogin() async {
-    final email    = _emailCtrl.text.trim();
-    final password = _passwordCtrl.text;
+  // ══════════════════════════════════════════════════════════════════════
+  // LOGIQUE INSCRIPTION
+  // ══════════════════════════════════════════════════════════════════════
 
-    if (email.isEmpty || password.isEmpty) {
-      _showError('Veuillez remplir tous les champs.');
+  Future<void> _signup() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedRole == null) {
+      _showError('Veuillez sélectionner un rôle');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final success = await AuthService.login(email, password);
+      final keycloakRole = _selectedRole == AppStrings.pharmacien
+          ? 'PHARMACIEN'
+          : 'PATIENT';
+
+      // ── Étape 1 : Appel au backend → crée le compte dans Keycloak ──────
+      // Le backend appelle Keycloak depuis le serveur (pas de CORS)
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/users/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'email'      : _emailController.text.trim(),
+          'password'   : _passwordController.text,
+          'firstName'  : _prenomController.text.trim(),
+          'lastName'   : _nomController.text.trim(),
+          'phoneNumber': _telephoneController.text.trim(),
+          'address'    : _adresseController.text.trim(),
+          'role'       : keycloakRole,
+        }),
+      );
+
       if (!mounted) return;
 
-      if (success) {
-        await ApiService.syncProfile();
-        final role = await AuthService.getRole();
+      if (response.statusCode == 200) {
+        // ── Étape 2 : Connexion automatique avec les identifiants saisis ──
+        final loggedIn = await AuthService.login(
+          _emailController.text.trim(),
+          _passwordController.text,
+        );
+
         if (!mounted) return;
 
-        if (role == 'PHARMACIEN' || role == 'ADMIN') {
-          Navigator.pushReplacementNamed(context, AppRoutes.pharmacienDashboard);
+        if (loggedIn) {
+          // ── Étape 3 : Sync profil dans le backend MySQL ────────────────
+          await ApiService.syncProfile();
+
+          if (!mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Inscription réussie ! Bienvenue ${_prenomController.text.trim()}'),
+              backgroundColor: AppColors.primaryGreen,
+            ),
+          );
+
+          // ── Étape 4 : Redirection selon le rôle ───────────────────────
+          if (_selectedRole == AppStrings.pharmacien) {
+            Navigator.pushReplacementNamed(
+                context, AppRoutes.pharmacienDashboard);
+          } else {
+            Navigator.pushReplacementNamed(
+                context, AppRoutes.patientDashboard);
+          }
         } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
+          // Compte créé mais login auto échoué → rediriger vers login
+          _showError(
+              'Compte créé ! Connectez-vous avec vos identifiants.');
+          Navigator.pushReplacementNamed(context, AppRoutes.login);
         }
+      } else if (response.statusCode == 409) {
+        _showError('Cet email est déjà utilisé. Essayez de vous connecter.');
       } else {
-        _showError('Email ou mot de passe incorrect. Vérifiez vos identifiants.');
+        // Parser le body seulement s'il n'est pas vide
+        String errorMsg = 'Erreur ${response.statusCode}';
+        if (response.body.isNotEmpty) {
+          try {
+            final body = json.decode(response.body);
+            errorMsg = body['error'] ?? errorMsg;
+          } catch (_) {
+            errorMsg = response.body;
+          }
+        }
+        _showError(errorMsg);
       }
     } catch (e) {
-      if (mounted) _showError('Erreur réseau : $e');
+      _showError('Impossible de contacter le serveur : $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _showError(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: AppColors.errorRed,
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 5),
       ),
     );
   }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // UI — identique à l'original
+  // ══════════════════════════════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        title: const Text(AppStrings.signup),
+        backgroundColor: AppColors.primaryBlue,
+        foregroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: AppColors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Créer un compte',
-          style: TextStyle(
-              color: AppColors.black,
-              fontWeight: FontWeight.bold,
-              fontSize: 18),
-        ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
+                const Text(
+                  'Créer un compte',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryBlue,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Rejoignez notre plateforme de gestion pharmaceutique',
+                  style: TextStyle(fontSize: 14, color: AppColors.grey),
+                ),
+                const SizedBox(height: 30),
 
-              // Illustration
-              Center(
-                child: Container(
-                  width: 90,
-                  height: 90,
+                // ── Nom ─────────────────────────────────────────────────
+                _label('Nom'),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  hint: 'Entrez votre nom',
+                  icon: Icons.person_outline,
+                  controller: _nomController,
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Le nom est requis' : null,
+                ),
+                const SizedBox(height: 16),
+
+                // ── Prénom ───────────────────────────────────────────────
+                _label('Prénom'),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  hint: 'Entrez votre prénom',
+                  icon: Icons.person_outline,
+                  controller: _prenomController,
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Le prénom est requis' : null,
+                ),
+                const SizedBox(height: 16),
+
+                // ── Email ────────────────────────────────────────────────
+                _label('Email'),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  hint: 'exemple@email.com',
+                  icon: Icons.email_outlined,
+                  controller: _emailController,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'L\'email est requis';
+                    if (!v.contains('@') || !v.contains('.')) {
+                      return 'Email invalide';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // ── Téléphone ────────────────────────────────────────────
+                _label('Téléphone'),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  hint: '06 XX XX XX XX',
+                  icon: Icons.phone_outlined,
+                  controller: _telephoneController,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return 'Le téléphone est requis';
+                    }
+                    if (v.replaceAll(' ', '').length < 8) {
+                      return 'Numéro invalide';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // ── Adresse ──────────────────────────────────────────────
+                _label('Adresse'),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  hint: 'Votre adresse complète',
+                  icon: Icons.location_on_outlined,
+                  controller: _adresseController,
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'L\'adresse est requise' : null,
+                ),
+                const SizedBox(height: 16),
+
+                // ── Rôle ─────────────────────────────────────────────────
+                _label('Vous êtes :'),
+                const SizedBox(height: 8),
+                Container(
                   decoration: BoxDecoration(
-                    color: AppColors.primaryGreen.withOpacity(0.1),
-                    shape: BoxShape.circle,
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.person_add_outlined,
-                      size: 46, color: AppColors.primaryGreen),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              const Text(
-                'Rejoindre PharmConnect',
-                style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.black),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Les comptes sont créés par l'administrateur. "
-                'Entrez les identifiants reçus pour vous connecter.',
-                style: TextStyle(
-                    fontSize: 14, color: AppColors.grey, height: 1.6),
-              ),
-              const SizedBox(height: 24),
-
-              // Étapes
-              _buildStep('1',
-                  "Contacter l'administrateur pour créer votre compte"),
-              const SizedBox(height: 12),
-              _buildStep('2', 'Recevoir votre email + mot de passe'),
-              const SizedBox(height: 12),
-              _buildStep('3', 'Entrer vos identifiants ci-dessous'),
-              const SizedBox(height: 28),
-
-              // ── Champ Email ────────────────────────────────────────────────
-              TextField(
-                controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  hintText: 'votre@email.com',
-                  prefixIcon: const Icon(Icons.email_outlined,
-                      color: AppColors.primaryGreen),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                        color: AppColors.primaryGreen, width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ── Champ Mot de passe ─────────────────────────────────────────
-              TextField(
-                controller: _passwordCtrl,
-                obscureText: _obscurePass,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _handleFirstLogin(),
-                decoration: InputDecoration(
-                  labelText: 'Mot de passe',
-                  prefixIcon: const Icon(Icons.lock_outline,
-                      color: AppColors.primaryGreen),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePass
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: AppColors.grey,
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedRole,
+                    hint: const Text('Sélectionnez votre rôle'),
+                    icon: const Icon(Icons.arrow_drop_down),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
                     ),
-                    onPressed: () =>
-                        setState(() => _obscurePass = !_obscurePass),
-                  ),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                        color: AppColors.primaryGreen, width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // ── Bouton ─────────────────────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleFirstLogin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                    disabledBackgroundColor:
-                        AppColors.primaryGreen.withOpacity(0.6),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Se connecter avec mon compte',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16),
+                    items: _roles.map((String role) {
+                      return DropdownMenuItem<String>(
+                        value: role,
+                        child: Row(
+                          children: [
+                            Icon(
+                              role == AppStrings.patient
+                                  ? Icons.person
+                                  : Icons.local_pharmacy,
+                              color: role == AppStrings.patient
+                                  ? AppColors.primaryBlue
+                                  : AppColors.primaryGreen,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(role),
+                          ],
                         ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Lien retour
-              Center(
-                child: TextButton(
-                  onPressed: () => Navigator.pushReplacementNamed(
-                      context, AppRoutes.login),
-                  child: const Text(
-                    'Déjà un compte ? Se connecter',
-                    style: TextStyle(
-                        color: AppColors.primaryGreen,
-                        fontWeight: FontWeight.w600),
+                      );
+                    }).toList(),
+                    onChanged: (v) => setState(() => _selectedRole = v),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Le rôle est requis' : null,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+
+                // ── Mot de passe ─────────────────────────────────────────
+                _label('Mot de passe'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    hintText: 'Minimum 8 caractères',
+                    prefixIcon: const Icon(Icons.lock_outline,
+                        color: AppColors.primaryBlue),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: AppColors.grey,
+                      ),
+                      onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: AppColors.lightGrey,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return 'Le mot de passe est requis';
+                    }
+                    if (v.length < 8) return 'Minimum 8 caractères';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // ── Confirmer mot de passe ───────────────────────────────
+                _label('Confirmer le mot de passe'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirmPassword,
+                  decoration: InputDecoration(
+                    hintText: 'Retapez votre mot de passe',
+                    prefixIcon: const Icon(Icons.lock_outline,
+                        color: AppColors.primaryBlue),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: AppColors.grey,
+                      ),
+                      onPressed: () => setState(() =>
+                          _obscureConfirmPassword = !_obscureConfirmPassword),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: AppColors.lightGrey,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return 'Veuillez confirmer le mot de passe';
+                    }
+                    if (v != _passwordController.text) {
+                      return 'Les mots de passe ne correspondent pas';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 30),
+
+                // ── Bouton Inscription ───────────────────────────────────
+                CustomButton(
+                  text: AppStrings.signup,
+                  onPressed: _signup,
+                  isLoading: _isLoading,
+                  color: AppColors.primaryBlue,
+                ),
+                const SizedBox(height: 20),
+
+                // ── Lien vers connexion ──────────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Déjà un compte ? ',
+                      style: TextStyle(color: AppColors.grey),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pushReplacementNamed(
+                          context, AppRoutes.login),
+                      child: const Text(
+                        'Se connecter',
+                        style: TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildStep(String number, String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 30,
-          height: 30,
-          decoration: const BoxDecoration(
-              color: AppColors.primaryGreen, shape: BoxShape.circle),
-          child: Center(
-            child: Text(number,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13)),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 5),
-            child: Text(text,
-                style: const TextStyle(
-                    fontSize: 14, color: AppColors.black, height: 1.5)),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _label(String text) => Text(
+        text,
+        style:
+            const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      );
 }
