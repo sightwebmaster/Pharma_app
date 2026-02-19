@@ -1,0 +1,16 @@
+E:\pharma-microservices\user-service\src\main\java\com\pharma\config\GlobalExceptionHandler.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\repository\FamilyMemberRepository.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\repository\UserRepository.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\dto\UserDTO.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\dto\UpdateProfileRequest.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\entity\FamilyMember.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\dto\AllergyDTO.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\repository\AllergyRepository.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\config\SecurityConfig.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\entity\Allergy.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\UserServiceApplication.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\entity\User.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\controller\UserController.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\dto\SyncRequest.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\service\UserService.java
+E:\pharma-microservices\user-service\src\main\java\com\pharma\entity\Role.java
