@@ -13,22 +13,35 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool _isLoading = false;
+  final _emailCtrl    = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _isLoading  = false;
+  bool _obscurePass = true;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleLogin() async {
+    final email    = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      _showError('Veuillez remplir tous les champs.');
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // 1. Ouvre Keycloak dans le navigateur
-      final success = await AuthService.login();
-
+      final success = await AuthService.login(email, password);
       if (!mounted) return;
 
       if (success) {
-        // 2. Synchroniser le profil avec le backend
         await ApiService.syncProfile();
-
-        // 3. Rediriger selon le rôle
         final role = await AuthService.getRole();
         if (!mounted) return;
 
@@ -38,10 +51,10 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
         }
       } else {
-        _showError('Connexion annulée ou échouée. Réessayez.');
+        _showError('Email ou mot de passe incorrect.');
       }
     } catch (e) {
-      if (mounted) _showError('Erreur de connexion: $e');
+      if (mounted) _showError('Erreur réseau : $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -67,21 +80,21 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 80),
+              const SizedBox(height: 60),
 
               // Logo
               SvgPicture.asset(
                 'assets/images/pharmaconnect-logo.svg',
-                height: 110,
-                width: 110,
+                height: 100,
+                width: 100,
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Titre
               const Text(
                 'PharmConnect',
                 style: TextStyle(
-                  fontSize: 30,
+                  fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primaryGreen,
                 ),
@@ -89,25 +102,74 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 8),
               const Text(
                 'Votre assistant pharmaceutique',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppColors.grey,
+                style: TextStyle(fontSize: 14, color: AppColors.grey),
+              ),
+              const SizedBox(height: 40),
+
+              // ── Champ Email ────────────────────────────────────────────────
+              TextField(
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'votre@email.com',
+                  prefixIcon: const Icon(Icons.email_outlined,
+                      color: AppColors.primaryGreen),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                        color: AppColors.primaryGreen, width: 2),
+                  ),
                 ),
               ),
-              const SizedBox(height: 70),
+              const SizedBox(height: 16),
 
-              // Bouton connexion
+              // ── Champ Mot de passe ─────────────────────────────────────────
+              TextField(
+                controller: _passwordCtrl,
+                obscureText: _obscurePass,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _handleLogin(),
+                decoration: InputDecoration(
+                  labelText: 'Mot de passe',
+                  prefixIcon: const Icon(Icons.lock_outline,
+                      color: AppColors.primaryGreen),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePass
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: AppColors.grey,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePass = !_obscurePass),
+                  ),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                        color: AppColors.primaryGreen, width: 2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // ── Bouton Se connecter ────────────────────────────────────────
               SizedBox(
                 width: double.infinity,
-                height: 56,
+                height: 54,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleLogin,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryGreen,
-                    disabledBackgroundColor: AppColors.primaryGreen.withOpacity(0.6),
+                    disabledBackgroundColor:
+                        AppColors.primaryGreen.withOpacity(0.6),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                        borderRadius: BorderRadius.circular(14)),
                     elevation: 2,
                   ),
                   child: _isLoading
@@ -115,78 +177,41 @@ class _LoginScreenState extends State<LoginScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             SizedBox(
-                              width: 22,
-                              height: 22,
+                              width: 20,
+                              height: 20,
                               child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
+                                  color: Colors.white, strokeWidth: 2.5),
                             ),
                             SizedBox(width: 12),
-                            Text(
-                              'Connexion en cours...',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            Text('Connexion en cours...',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold)),
                           ],
                         )
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.login, color: Colors.white, size: 22),
+                            Icon(Icons.login, color: Colors.white, size: 20),
                             SizedBox(width: 10),
-                            Text(
-                              'Se connecter',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            Text('Se connecter',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold)),
                           ],
                         ),
                 ),
               ),
+              const SizedBox(height: 24),
 
-              const SizedBox(height: 20),
-
-              // Info Keycloak
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGreen.withOpacity(0.07),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline,
-                        color: AppColors.primaryGreen, size: 18),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'La connexion s\'effectue via Keycloak.\nChoisissez votre compte patient ou pharmacien.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.grey,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Lien inscription
+              // ── Lien inscription ───────────────────────────────────────────
               TextButton(
                 onPressed: () =>
                     Navigator.pushNamed(context, AppRoutes.signup),
                 child: const Text(
-                  'Pas encore de compte ? S\'inscrire',
+                  "Pas encore de compte ? S'inscrire",
                   style: TextStyle(
                     color: AppColors.primaryGreen,
                     fontWeight: FontWeight.w600,
@@ -194,6 +219,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
