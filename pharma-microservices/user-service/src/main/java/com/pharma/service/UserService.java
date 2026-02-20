@@ -90,8 +90,8 @@ public class UserService {
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
         body.add("grant_type", "password");
         body.add("client_id",  "admin-cli");
-        body.add("username",   "admin");
-        body.add("password",   "admin"); // ← mot de passe admin Keycloak
+        body.add("username",   "mariem");
+        body.add("password",   "mariem123"); // ← mot de passe admin Keycloak
 
         ResponseEntity<Map> resp = rt.exchange(
             "http://localhost:8080/realms/master/protocol/openid-connect/token",
