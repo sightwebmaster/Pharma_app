@@ -8,6 +8,7 @@ E:\Pharma_app\pharma-microservices\user-service\src\main\java\com\pharma\dto\Syn
 E:\Pharma_app\pharma-microservices\user-service\src\main\java\com\pharma\UserServiceApplication.java
 E:\Pharma_app\pharma-microservices\user-service\src\main\java\com\pharma\dto\UserDTO.java
 E:\Pharma_app\pharma-microservices\user-service\src\main\java\com\pharma\entity\Allergy.java
+E:\Pharma_app\pharma-microservices\user-service\src\main\java\com\pharma\dto\FamilyMemberDTO.java
 E:\Pharma_app\pharma-microservices\user-service\src\main\java\com\pharma\repository\UserRepository.java
 E:\Pharma_app\pharma-microservices\user-service\src\main\java\com\pharma\service\UserService.java
 E:\Pharma_app\pharma-microservices\user-service\src\main\java\com\pharma\dto\AllergyDTO.java

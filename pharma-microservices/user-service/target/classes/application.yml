@@ -7,7 +7,8 @@ spring:
 
   # ── BASE DE DONNÉES MySQL ──────────────────────────────────────────────────
   datasource:
-    url: jdbc:mysql://localhost:3306/user_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+    # useUnicode=true → corrige l'erreur UUID binaire "\xD6\xEE..."
+    url: jdbc:mysql://localhost:3306/user_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8
     username: user_svc
     password: user_secret
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -19,7 +20,7 @@ spring:
   # ── JPA / HIBERNATE ───────────────────────────────────────────────────────
   jpa:
     hibernate:
-      ddl-auto: update        # Crée/met à jour les tables automatiquement
+      ddl-auto: create    # ← "create" pour recréer les tables proprement (repasser à "update" après)
     show-sql: true
     properties:
       hibernate:

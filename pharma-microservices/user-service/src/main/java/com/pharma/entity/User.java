@@ -3,7 +3,9 @@ package com.pharma.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,10 +23,10 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "VARCHAR(36)")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(columnDefinition = "VARCHAR(36)", updatable = false, nullable = false)
     private UUID id;
 
-    /** ID Keycloak (sub du JWT) — unique par utilisateur */
     @Column(name = "keycloak_id", unique = true, nullable = false, length = 100)
     private String keycloakId;
 
@@ -47,7 +49,6 @@ public class User {
     @Column(nullable = false, length = 20)
     private Role role;
 
-    /** Token FCM pour les notifications push (Sprint 3) */
     @Column(name = "fcm_token", length = 500)
     private String fcmToken;
 
