@@ -1,0 +1,56 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: user-service
+
+  # ── BASE DE DONNÉES MySQL ──────────────────────────────────────────────────
+  datasource:
+    # useUnicode=true → corrige l'erreur UUID binaire "\xD6\xEE..."
+    url: jdbc:mysql://localhost:3306/user_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8
+    username: user_svc
+    password: user_secret
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+
+  # ── JPA / HIBERNATE ───────────────────────────────────────────────────────
+  jpa:
+    hibernate:
+      ddl-auto: create    # ← "create" pour recréer les tables proprement (repasser à "update" après)
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  # ── SECURITE JWT (Keycloak) ───────────────────────────────────────────────
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/pharma-app
+
+  # ── DÉSACTIVER KAFKA (Sprint 1 uniquement) ────────────────────────────────
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+# ── ACTUATOR ──────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ── LOGS ──────────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.pharma: DEBUG
+    org.springframework.security: INFO
