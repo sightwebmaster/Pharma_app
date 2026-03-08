@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/routes/app_routes.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 
@@ -41,32 +43,78 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _signup() {
-    if (_formKey.currentState!.validate() && _selectedRole != null) {
-      setState(() => _isLoading = true);
-      
-      // Simuler une inscription (à remplacer par votre logique d'authentification)
-      Future.delayed(const Duration(seconds: 2), () {
-        setState(() => _isLoading = false);
-        
-        // Rediriger vers le dashboard selon le rôle
-        if (_selectedRole == AppStrings.patient) {
-          Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
-        } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.pharmacienDashboard);
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Inscription réussie! Bienvenue ${_prenomController.text}'),
-            backgroundColor: AppColors.primaryGreen,
-          ),
-        );
-      });
-    } else if (_selectedRole == null) {
+  void _signup() async {
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir tous les champs correctement'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedRole == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez sélectionner un rôle'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
+    // Vérifier que les mots de passe correspondent
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Les mots de passe ne correspondent pas'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // Appel API signup via AuthViewModel
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+
+    final success = await authViewModel.signup(
+      nom: _nomController.text.trim(),
+      prenom: _prenomController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      telephone: _telephoneController.text.trim(),
+      adresse: _adresseController.text.trim(),
+      role: _selectedRole!,
+      // Ajouter pharmacyName et licenseNumber si Pharmacien (optionnel)
+    );
+
+    setState(() => _isLoading = false);
+
+    if (success && mounted) {
+      // Succès: rediriger selon le rôle
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Inscription réussie! Bienvenue ${_prenomController.text}',
+          ),
+          backgroundColor: AppColors.primaryGreen,
+        ),
+      );
+
+      final role = authViewModel.currentUser?.role;
+      if (role?.toLowerCase() == 'patient') {
+        Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
+      } else if (role?.toLowerCase() == 'pharmacien') {
+        Navigator.pushReplacementNamed(context, AppRoutes.pharmacienDashboard);
+      }
+    } else if (mounted) {
+      // Erreur
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authViewModel.errorMessage ?? 'Erreur d\'inscription'),
           backgroundColor: AppColors.errorRed,
         ),
       );
@@ -102,20 +150,14 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 8),
                 const Text(
                   'Rejoignez notre plateforme de gestion pharmaceutique',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.grey,
-                  ),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey),
                 ),
                 const SizedBox(height: 30),
 
                 // Champ Nom
                 const Text(
                   'Nom',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -134,10 +176,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Prénom
                 const Text(
                   'Prénom',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -156,10 +195,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Email
                 const Text(
                   'Email',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -181,10 +217,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Téléphone
                 const Text(
                   'Téléphone',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -206,10 +239,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Adresse
                 const Text(
                   'Adresse',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -228,10 +258,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Sélection du Rôle
                 const Text(
                   'Vous êtes :',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -240,7 +267,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: DropdownButtonFormField<String>(
-                    value: _selectedRole,
+                    initialValue: _selectedRole,
                     hint: const Text('Sélectionnez votre rôle'),
                     icon: const Icon(Icons.arrow_drop_down),
                     decoration: const InputDecoration(
@@ -253,11 +280,11 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: Row(
                           children: [
                             Icon(
-                              role == AppStrings.patient 
-                                  ? Icons.person 
+                              role == AppStrings.patient
+                                  ? Icons.person
                                   : Icons.local_pharmacy,
-                              color: role == AppStrings.patient 
-                                  ? AppColors.primaryBlue 
+                              color: role == AppStrings.patient
+                                  ? AppColors.primaryBlue
                                   : AppColors.primaryGreen,
                               size: 20,
                             ),
@@ -285,10 +312,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Mot de passe
                 const Text(
                   'Mot de passe',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -296,10 +320,15 @@ class _SignupScreenState extends State<SignupScreen> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     hintText: 'Minimum 8 caractères',
-                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryBlue),
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      color: AppColors.primaryBlue,
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                         color: AppColors.grey,
                       ),
                       onPressed: () {
@@ -314,7 +343,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     filled: true,
                     fillColor: AppColors.lightGrey,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -331,10 +363,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Confirmer mot de passe
                 const Text(
                   'Confirmer le mot de passe',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -342,10 +371,15 @@ class _SignupScreenState extends State<SignupScreen> {
                   obscureText: _obscureConfirmPassword,
                   decoration: InputDecoration(
                     hintText: 'Retapez votre mot de passe',
-                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryBlue),
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      color: AppColors.primaryBlue,
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                        _obscureConfirmPassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                         color: AppColors.grey,
                       ),
                       onPressed: () {
@@ -360,7 +394,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     filled: true,
                     fillColor: AppColors.lightGrey,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -392,7 +429,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     GestureDetector(
                       onTap: () {
-                        Navigator.pushReplacementNamed(context, AppRoutes.login);
+                        Navigator.pushReplacementNamed(
+                          context,
+                          AppRoutes.login,
+                        );
                       },
                       child: const Text(
                         'Se connecter',
