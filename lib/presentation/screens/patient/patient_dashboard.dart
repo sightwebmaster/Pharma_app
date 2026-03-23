@@ -5,6 +5,12 @@ import 'package:provider/provider.dart';
 import '../../../presentation/viewmodels/auth_viewmodel.dart';
 import '../../../presentation/viewmodels/medication_viewmodel.dart';
 import '../../../presentation/viewmodels/proche_viewmodel.dart';
+import '../../../presentation/viewmodels/add_proche_viewmodel.dart';
+import '../../../core/routes/app_routes.dart';
+import '../../../presentation/widgets/patient_qrcode_widget.dart';
+import '../../../presentation/widgets/qr_scanner_widget.dart';
+import '../../../services/storage_service.dart';
+import '../../../data/models/proche_model.dart';
 
 class PatientDashboard extends StatefulWidget {
   const PatientDashboard({super.key});
@@ -131,11 +137,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                ...context
-                    .watch<MedicationViewModel>()
-                    .todayMedications
-                    .map((med) => _buildPlanningMedItem(med))
-                    ,
+                ...context.watch<MedicationViewModel>().todayMedications.map(
+                  (med) => _buildPlanningMedItem(med),
+                ),
               ],
             ),
           ),
@@ -469,9 +473,37 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   )
                 : proches.isEmpty
                 ? Center(
-                    child: Text(
-                      'Aucun proche ajouté',
-                      style: TextStyle(fontSize: 13, color: AppColors.grey),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Aucun proche ajouté',
+                          style: TextStyle(fontSize: 13, color: AppColors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.pushNamed(
+                              context,
+                              '/add-proche',
+                            );
+                            if (result == true && mounted) {
+                              // Rafraîchir la liste des proches
+                              context.read<ProcheViewModel>().refresh();
+                            }
+                          },
+                          icon: const Icon(Icons.person_add, size: 16),
+                          label: const Text('Ajouter un proche'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryGreen,
+                            foregroundColor: AppColors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.builder(
@@ -483,6 +515,33 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     },
                   ),
           ),
+          if (proches.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.pushNamed(
+                    context,
+                    '/add-proche',
+                  );
+                  if (result == true && mounted) {
+                    // Rafraîchir la liste des proches
+                    context.read<ProcheViewModel>().refresh();
+                  }
+                },
+                icon: const Icon(Icons.person_add, size: 18),
+                label: const Text('Ajouter un autre proche'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: AppColors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -496,7 +555,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
         : AppColors.errorRed;
 
     return GestureDetector(
-      onTap: () => _showProcheQRDialog(member),
+      onTap: () {
+        // Convertir Map en ProcheModel et naviguer vers ProcheDetailScreen
+        final proche = ProcheModel.fromJson(member);
+        AppRoutes.navigateToProcheDetail(context, proche);
+      },
       child: Container(
         width: 160,
         margin: const EdgeInsets.only(right: 12),
@@ -674,51 +737,112 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   void _showAddProcheDialog() {
-    final TextEditingController patientIdController = TextEditingController();
-    String selectedRelation = 'Père';
+    final TextEditingController emailController = TextEditingController();
+    String selectedRelation = 'Pere';
     final List<String> relations = [
-      'Père',
-      'Mère',
-      'Grand-père',
-      'Grand-mère',
-      'Enfant',
+      'Pere',
+      'Mere',
       'Conjoint',
+      'Enfant',
+      'Frere',
+      'Soeur',
+      'Grand-pere',
+      'Grand-mere',
+      'Autre',
     ];
 
     showDialog(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (buildContext, setState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
-              title: const Text(
-                'Ajouter un proche',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.black,
-                ),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Ajouter un proche',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.black,
+                    ),
+                  ),
+                  // Icône QR Scanner en haut à droite
+                  IconButton(
+                    icon: const Icon(
+                      Icons.qr_code_scanner,
+                      color: AppColors.primaryGreen,
+                      size: 28,
+                    ),
+                    onPressed: () async {
+                      // Fermer le dialog actuel
+                      Navigator.pop(dialogContext);
+
+                      // Ouvrir le scanner QR
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => QRScannerWidget(
+                            onQRCodeScanned: (qrData) async {
+                              // Le QR code contient le procheUserId
+                              // Demander la relation
+                              _showRelationSelectionDialog(qrData);
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    tooltip: 'Scanner QR Code',
+                  ),
+                ],
               ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Entrez l\'ID ou l\'email du patient à ajouter comme proche',
-                      style: TextStyle(fontSize: 13, color: AppColors.grey),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primaryBlue.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: AppColors.primaryBlue,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Le proche doit être déjà inscrit',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.primaryBlue,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
-                      controller: patientIdController,
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
-                        labelText: 'ID ou Email du patient',
+                        labelText: 'Email du proche',
                         hintText: 'exemple@email.com',
                         prefixIcon: const Icon(
-                          Icons.person_search,
+                          Icons.email_outlined,
                           color: AppColors.primaryGreen,
                         ),
                         border: OutlineInputBorder(
@@ -761,7 +885,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                             return DropdownMenuItem<String>(
                               value: relation,
                               child: Text(
-                                relation,
+                                _relationLabel(relation),
                                 style: const TextStyle(fontSize: 15),
                               ),
                             );
@@ -787,77 +911,75 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     style: TextStyle(color: AppColors.grey, fontSize: 15),
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final patientId = patientIdController.text.trim();
+                Consumer<AddProcheViewModel>(
+                  builder: (context, viewModel, _) {
+                    return ElevatedButton(
+                      onPressed: viewModel.isLoading
+                          ? null
+                          : () async {
+                              final email = emailController.text.trim();
 
-                    if (patientId.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Veuillez entrer un ID ou email'),
-                          backgroundColor: AppColors.errorRed,
-                        ),
-                      );
-                      return;
-                    }
+                              if (email.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Veuillez entrer un email'),
+                                    backgroundColor: AppColors.errorRed,
+                                  ),
+                                );
+                                return;
+                              }
 
-                    Navigator.pop(dialogContext);
+                              final success = await viewModel.addProcheByEmail(
+                                email: email,
+                                relation: selectedRelation,
+                              );
 
-                    // Show loading indicator
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primaryGreen,
+                              if (success && context.mounted) {
+                                Navigator.pop(dialogContext);
+                                // Rafraîchir la liste
+                                context.read<ProcheViewModel>().refresh();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Proche ajouté avec succès !'),
+                                    backgroundColor: AppColors.primaryGreen,
+                                  ),
+                                );
+                              } else if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      viewModel.error ?? 'Erreur lors de l\'ajout',
+                                    ),
+                                    backgroundColor: AppColors.errorRed,
+                                  ),
+                                );
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      child: viewModel.isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'Ajouter',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     );
-
-                    // Call the ViewModel to add proche
-                    final success = await context
-                        .read<ProcheViewModel>()
-                        .addProche(
-                          patientId: patientId,
-                          relation: selectedRelation,
-                        );
-
-                    // Close loading indicator
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                    }
-
-                    // Show success or error message
-                    if (context.mounted) {
-                      final error = context.read<ProcheViewModel>().error;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            success
-                                ? 'Proche ajouté avec succès !'
-                                : error ?? 'Erreur lors de l\'ajout',
-                          ),
-                          backgroundColor: success
-                              ? AppColors.primaryGreen
-                              : AppColors.errorRed,
-                        ),
-                      );
-                    }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Ajouter',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ),
               ],
             );
@@ -865,6 +987,209 @@ class _PatientDashboardState extends State<PatientDashboard> {
         );
       },
     );
+  }
+
+  // Helper pour afficher le dialog de sélection de relation après scan QR
+  void _showRelationSelectionDialog(String procheUserId) {
+    String selectedRelation = 'Pere';
+    final List<String> relations = [
+      'Pere',
+      'Mere',
+      'Conjoint',
+      'Enfant',
+      'Frere',
+      'Soeur',
+      'Grand-pere',
+      'Grand-mere',
+      'Autre',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (buildContext, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text(
+                'Sélectionner la relation',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.black,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGreen.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.qr_code_2,
+                          color: AppColors.primaryGreen,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'QR Code scanné avec succès',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.primaryGreen,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Quelle est votre relation avec cette personne ?',
+                    style: TextStyle(fontSize: 14, color: AppColors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: selectedRelation,
+                        isExpanded: true,
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: AppColors.primaryGreen,
+                        ),
+                        items: relations.map((String relation) {
+                          return DropdownMenuItem<String>(
+                            value: relation,
+                            child: Text(
+                              _relationLabel(relation),
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              selectedRelation = newValue;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text(
+                    'Annuler',
+                    style: TextStyle(color: AppColors.grey, fontSize: 15),
+                  ),
+                ),
+                Consumer<AddProcheViewModel>(
+                  builder: (context, viewModel, _) {
+                    return ElevatedButton(
+                      onPressed: viewModel.isLoading
+                          ? null
+                          : () async {
+                              final success = await viewModel.addProcheByQRCode(
+                                procheUserId: procheUserId,
+                                relation: selectedRelation,
+                              );
+
+                              if (success && context.mounted) {
+                                Navigator.pop(dialogContext);
+                                // Rafraîchir la liste
+                                context.read<ProcheViewModel>().refresh();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Proche ajouté avec succès !'),
+                                    backgroundColor: AppColors.primaryGreen,
+                                  ),
+                                );
+                              } else if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      viewModel.error ?? 'Erreur lors de l\'ajout',
+                                    ),
+                                    backgroundColor: AppColors.errorRed,
+                                  ),
+                                );
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: viewModel.isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'Ajouter',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Helper pour les labels de relations
+  String _relationLabel(String relation) {
+    switch (relation) {
+      case 'Pere':
+        return 'Père';
+      case 'Mere':
+        return 'Mère';
+      case 'Conjoint':
+        return 'Conjoint(e)';
+      case 'Enfant':
+        return 'Enfant';
+      case 'Frere':
+        return 'Frère';
+      case 'Soeur':
+        return 'Sœur';
+      case 'Grand-pere':
+        return 'Grand-père';
+      case 'Grand-mere':
+        return 'Grand-mère';
+      case 'Autre':
+        return 'Autre';
+      default:
+        return relation;
+    }
   }
 
   void _showProcheQRDialog(Map<String, dynamic> proche) {
@@ -1675,11 +2000,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
             ),
           ),
           const SizedBox(height: 12),
-          ...context
-              .watch<MedicationViewModel>()
-              .medications
-              .map((med) => _buildPlanningMedItem(med))
-              ,
+          ...context.watch<MedicationViewModel>().medications.map(
+            (med) => _buildPlanningMedItem(med),
+          ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
@@ -2345,19 +2668,48 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   _buildProfileItem(
                     Icons.water_drop_outlined,
                     'Groupe sanguin',
-                    'A+',
+                    context.watch<AuthViewModel>().currentUser?.groupeSanguin ??
+                        'Non renseigné',
                   ),
                   _buildProfileItem(
                     Icons.warning_amber_outlined,
                     'Allergies',
-                    'Pénicilline',
+                    context.watch<AuthViewModel>().currentUser?.allergies.isEmpty ??
+                            true
+                        ? 'Aucune'
+                        : context
+                                .watch<AuthViewModel>()
+                                .currentUser
+                                ?.allergies
+                                .join(', ') ??
+                            'Aucune',
                   ),
                   _buildProfileItem(
                     Icons.medical_information_outlined,
                     'Maladies chroniques',
-                    'Diabète type 2',
+                    context
+                                .watch<AuthViewModel>()
+                                .currentUser
+                                ?.maladiesChroniques
+                                .isEmpty ??
+                            true
+                        ? 'Aucune'
+                        : context
+                                .watch<AuthViewModel>()
+                                .currentUser
+                                ?.maladiesChroniques
+                                .join(', ') ??
+                            'Aucune',
                   ),
                 ]),
+                const SizedBox(height: 20),
+
+                // QR Code Widget
+                PatientQRCodeWidget(
+                  userId: context.watch<AuthViewModel>().currentUser?.id ??
+                      StorageService().getUserId() ??
+                      '',
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,

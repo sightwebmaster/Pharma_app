@@ -7,23 +7,28 @@ class UserModel {
   final String id;
   final String nom;
   final String prenom;
-  final String? email;  // NULLABLE car votre backend peut renvoyer null
+  final String? email;
+  final DateTime?
+  dateNaissance; // NULLABLE car votre backend peut renvoyer null
   final String? telephone;
   final String? adresse;
   final String role;
-  final String? pharmacyName;
-  final String? licenseNumber;
-  
+  final String? groupeSanguin;
+  final List<String> allergies;
+  final List<String> maladiesChroniques;
+
   UserModel({
     required this.id,
     required this.nom,
     required this.prenom,
     this.email,
+    this.dateNaissance,
     this.telephone,
     this.adresse,
     required this.role,
-    this.pharmacyName,
-    this.licenseNumber,
+    this.groupeSanguin,
+    this.allergies = const [],
+    this.maladiesChroniques = const [],
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) =>
@@ -42,22 +47,26 @@ class UserModel {
     String? nom,
     String? prenom,
     String? email,
+    DateTime? dateNaissance,
     String? telephone,
     String? adresse,
     String? role,
-    String? pharmacyName,
-    String? licenseNumber,
+    String? groupeSanguin,
+    List<String>? allergies,
+    List<String>? maladiesChroniques,
   }) {
     return UserModel(
       id: id ?? this.id,
       nom: nom ?? this.nom,
       prenom: prenom ?? this.prenom,
       email: email ?? this.email,
+      dateNaissance: dateNaissance ?? this.dateNaissance,
       telephone: telephone ?? this.telephone,
       adresse: adresse ?? this.adresse,
       role: role ?? this.role,
-      pharmacyName: pharmacyName ?? this.pharmacyName,
-      licenseNumber: licenseNumber ?? this.licenseNumber,
+      groupeSanguin: groupeSanguin ?? this.groupeSanguin,
+      allergies: allergies ?? this.allergies,
+      maladiesChroniques: maladiesChroniques ?? this.maladiesChroniques,
     );
   }
 }

@@ -30,7 +30,7 @@ class AuthService {
         await _storage.saveRefreshToken(authResponse.refreshToken!);
       }
       await _storage.saveUserId(authResponse.user.id);
-      await _storage.saveUserEmail(authResponse.user.email?? '');
+      await _storage.saveUserEmail(authResponse.user.email ?? '');
       await _storage.saveUserRole(authResponse.user.role);
       await _storage.saveUserName(authResponse.user.fullName);
       await _storage.saveIsLoggedIn(true);
@@ -63,25 +63,45 @@ class AuthService {
     required String password,
     required String telephone,
     required String adresse,
-    required String role, // "Patient" ou "Pharmacien"
+    required String role,
+    String? groupeSanguin,
+    List<String>? allergies,
+    List<String>? maladiesChroniques,
     String? pharmacyName,
     String? licenseNumber,
   }) async {
     try {
-      final response = await _dio.post(
-        ApiConfig.signupEndpoint,
-        data: {
-          'nom': nom,
-          'prenom': prenom,
-          'email': email,
-          'motDePasse': password,
-          'telephone': telephone,
-          'adresse': adresse,
-          'role': role,
-          'pharmacyName': ?pharmacyName,
-          'licenseNumber': ?licenseNumber,
-        },
-      );
+      final Map<String, dynamic> data = {
+        'nom': nom,
+        'prenom': prenom,
+        'email': email,
+        'motDePasse': password,
+        'telephone': telephone,
+        'adresse': adresse,
+        'role': role,
+        'groupeSanguin': groupeSanguin,
+        'allergies': allergies,
+        'maladiesChroniques': maladiesChroniques,
+      };
+
+      // Ajouter les champs optionnels s'ils sont présents
+      if (groupeSanguin != null) {
+        data['groupeSanguin'] = groupeSanguin;
+      }
+      if (allergies != null && allergies.isNotEmpty) {
+        data['allergies'] = allergies;
+      }
+      if (maladiesChroniques != null && maladiesChroniques.isNotEmpty) {
+        data['maladiesChroniques'] = maladiesChroniques;
+      }
+      if (pharmacyName != null) {
+        data['pharmacyName'] = pharmacyName;
+      }
+      if (licenseNumber != null) {
+        data['licenseNumber'] = licenseNumber;
+      }
+
+      final response = await _dio.post(ApiConfig.signupEndpoint, data: data);
 
       final authResponse = AuthResponseModel.fromJson(response.data);
 
@@ -91,7 +111,7 @@ class AuthService {
         await _storage.saveRefreshToken(authResponse.refreshToken!);
       }
       await _storage.saveUserId(authResponse.user.id);
-      await _storage.saveUserEmail(authResponse.user.email?? '');
+      await _storage.saveUserEmail(authResponse.user.email ?? '');
       await _storage.saveUserRole(authResponse.user.role);
       await _storage.saveUserName(authResponse.user.fullName);
       await _storage.saveIsLoggedIn(true);

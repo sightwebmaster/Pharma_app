@@ -439,11 +439,9 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
             ],
           ),
           const SizedBox(height: 16),
-          ...context
-              .watch<PharmacienViewModel>()
-              .patients
-              .map((p) => _buildScanPatientItem(p))
-              ,
+          ...context.watch<PharmacienViewModel>().patients.map(
+            (p) => _buildScanPatientItem(p),
+          ),
 
           // Patient scanné
           if (_scannedPatient != null) ...[
@@ -1259,8 +1257,7 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
                   _buildProfilItem(
                     Icons.badge_outlined,
                     'N° Ordre',
-                    context.watch<AuthViewModel>().currentUser?.licenseNumber ??
-                        'PHARM-2024-001',
+                    'PHARM-2024-001',
                   ),
                   _buildProfilItem(
                     Icons.star_outline,

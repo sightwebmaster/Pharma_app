@@ -73,6 +73,9 @@ class AuthViewModel extends ChangeNotifier {
     required String telephone,
     required String adresse,
     required String role,
+    String? groupeSanguin,
+    List<String>? allergies,
+    List<String>? maladiesChroniques,
     String? pharmacyName,
     String? licenseNumber,
   }) async {
@@ -88,6 +91,9 @@ class AuthViewModel extends ChangeNotifier {
       telephone: telephone,
       adresse: adresse,
       role: role,
+      groupeSanguin: groupeSanguin,
+      allergies: allergies,
+      maladiesChroniques: maladiesChroniques,
       pharmacyName: pharmacyName,
       licenseNumber: licenseNumber,
     );

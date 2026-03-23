@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:pharma_app/presentation/viewmodels/medication_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/pharmacien_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/proche_viewmodel.dart';
+import 'package:pharma_app/presentation/viewmodels/add_proche_viewmodel.dart';
+import 'package:pharma_app/presentation/viewmodels/proche_detail_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'core/routes/app_routes.dart';
 import 'core/themes/app_theme.dart';
@@ -33,6 +35,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MedicationViewModel()),
         ChangeNotifierProvider(create: (_) => PharmacienViewModel()),
         ChangeNotifierProvider(create: (_) => ProcheViewModel()),
+        ChangeNotifierProvider(create: (_) => AddProcheViewModel()),
+        ChangeNotifierProvider(create: (_) => ProcheDetailViewModel()),
       ],
       child: MaterialApp(
         title: 'Projet Pharma',

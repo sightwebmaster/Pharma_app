@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/constants/dropdown_constants.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../widgets/custom_button.dart';
@@ -23,13 +24,14 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPasswordController = TextEditingController();
   final _telephoneController = TextEditingController();
   final _adresseController = TextEditingController();
+  final _dateNaissanceController = TextEditingController();
 
-  String? _selectedRole;
+  String? _selectedGroupeSanguin;
+  final List<String> _selectedAllergies = [];
+  final List<String> _selectedMaladiesChroniques = [];
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-
-  final List<String> _roles = [AppStrings.patient, AppStrings.pharmacien];
 
   @override
   void dispose() {
@@ -40,7 +42,23 @@ class _SignupScreenState extends State<SignupScreen> {
     _confirmPasswordController.dispose();
     _telephoneController.dispose();
     _adresseController.dispose();
+    _dateNaissanceController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _dateNaissanceController.text =
+            '${picked.day}/${picked.month}/${picked.year}';
+      });
+    }
   }
 
   void _signup() async {
@@ -54,17 +72,6 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    if (_selectedRole == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner un rôle'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
-      return;
-    }
-
-    // Vérifier que les mots de passe correspondent
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -77,7 +84,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() => _isLoading = true);
 
-    // Appel API signup via AuthViewModel
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
 
     final success = await authViewModel.signup(
@@ -87,14 +93,15 @@ class _SignupScreenState extends State<SignupScreen> {
       password: _passwordController.text,
       telephone: _telephoneController.text.trim(),
       adresse: _adresseController.text.trim(),
-      role: _selectedRole!,
-      // Ajouter pharmacyName et licenseNumber si Pharmacien (optionnel)
+      role: AppStrings.patient,
+      groupeSanguin: _selectedGroupeSanguin,
+      allergies: _selectedAllergies,
+      maladiesChroniques: _selectedMaladiesChroniques,
     );
 
     setState(() => _isLoading = false);
 
     if (success && mounted) {
-      // Succès: rediriger selon le rôle
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -103,15 +110,8 @@ class _SignupScreenState extends State<SignupScreen> {
           backgroundColor: AppColors.primaryGreen,
         ),
       );
-
-      final role = authViewModel.currentUser?.role;
-      if (role?.toLowerCase() == 'patient') {
-        Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
-      } else if (role?.toLowerCase() == 'pharmacien') {
-        Navigator.pushReplacementNamed(context, AppRoutes.pharmacienDashboard);
-      }
+      Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
     } else if (mounted) {
-      // Erreur
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authViewModel.errorMessage ?? 'Erreur d\'inscription'),
@@ -255,9 +255,41 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Sélection du Rôle
+                // Champ Date de naissance
                 const Text(
-                  'Vous êtes :',
+                  'Date de naissance',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _selectDate,
+                  child: TextFormField(
+                    controller: _dateNaissanceController,
+                    enabled: false,
+                    decoration: InputDecoration(
+                      hintText: 'JJ/MM/AAAA',
+                      prefixIcon: const Icon(
+                        Icons.calendar_today,
+                        color: AppColors.primaryBlue,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.lightGrey,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Groupe sanguin
+                const Text(
+                  'Groupe sanguin',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
@@ -267,44 +299,89 @@ class _SignupScreenState extends State<SignupScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: DropdownButtonFormField<String>(
-                    initialValue: _selectedRole,
-                    hint: const Text('Sélectionnez votre rôle'),
-                    icon: const Icon(Icons.arrow_drop_down),
+                    initialValue: _selectedGroupeSanguin,
+                    hint: const Text('Sélectionnez votre groupe sanguin'),
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(horizontal: 16),
                     ),
-                    items: _roles.map((String role) {
+                    items: DropdownConstants.groupesSanguins.map((
+                      String value,
+                    ) {
                       return DropdownMenuItem<String>(
-                        value: role,
-                        child: Row(
-                          children: [
-                            Icon(
-                              role == AppStrings.patient
-                                  ? Icons.person
-                                  : Icons.local_pharmacy,
-                              color: role == AppStrings.patient
-                                  ? AppColors.primaryBlue
-                                  : AppColors.primaryGreen,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(role),
-                          ],
-                        ),
+                        value: value,
+                        child: Text(value),
                       );
                     }).toList(),
                     onChanged: (String? newValue) {
                       setState(() {
-                        _selectedRole = newValue;
+                        _selectedGroupeSanguin = newValue;
                       });
                     },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Le rôle est requis';
-                      }
-                      return null;
-                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Allergies (Multi-select)
+                const Text(
+                  'Allergies',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: DropdownConstants.allergies.map((String allergy) {
+                      return CheckboxListTile(
+                        title: Text(allergy),
+                        value: _selectedAllergies.contains(allergy),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedAllergies.add(allergy);
+                            } else {
+                              _selectedAllergies.remove(allergy);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Maladies chroniques (Multi-select)
+                const Text(
+                  'Maladies chroniques',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: DropdownConstants.maladiesChroniques.map((
+                      String maladie,
+                    ) {
+                      return CheckboxListTile(
+                        title: Text(maladie),
+                        value: _selectedMaladiesChroniques.contains(maladie),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedMaladiesChroniques.add(maladie);
+                            } else {
+                              _selectedMaladiesChroniques.remove(maladie);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
                   ),
                 ),
                 const SizedBox(height: 16),
