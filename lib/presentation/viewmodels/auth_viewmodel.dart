@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import '../../data/models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/patient_profile_service.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
 
 class AuthViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final PatientProfileService _profileService = PatientProfileService();
 
   AuthStatus _status = AuthStatus.initial;
   UserModel? _currentUser;
@@ -51,6 +53,18 @@ class AuthViewModel extends ChangeNotifier {
 
     if (response.success && response.data != null) {
       _currentUser = response.data!.user;
+
+      // Charger le profil complet du patient après le login
+      final profileResponse = await _profileService.getPatientProfile(
+        _currentUser!.id,
+      );
+
+      if (profileResponse.success && profileResponse.data != null) {
+        // Remplacer avec les données complètes du profil
+        _currentUser = profileResponse.data;
+      }
+      // Si le chargement du profil échoue, continuer avec les données basiques
+
       _status = AuthStatus.authenticated;
       _errorMessage = null;
       notifyListeners();

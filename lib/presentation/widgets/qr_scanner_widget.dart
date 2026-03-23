@@ -32,7 +32,8 @@ class _QRScannerWidgetState extends State<QRScannerWidget> {
           _isScanning = false;
         });
         widget.onQRCodeScanned(barcode.rawValue!);
-        Navigator.pop(context);
+        // Retourner la valeur du QR code au pop
+        Navigator.pop(context, barcode.rawValue);
       }
     }
   }

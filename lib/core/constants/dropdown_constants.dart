@@ -49,4 +49,17 @@ class DropdownConstants {
     'Obésité',
     'Aucune',
   ];
+
+  // Types de relations (pour proches)
+  static const List<String> relations = [
+    'Pere',
+    'Mere',
+    'Conjoint',
+    'Enfant',
+    'Frere',
+    'Soeur',
+    'Grand-pere',
+    'Grand-mere',
+    'Autre',
+  ];
 }

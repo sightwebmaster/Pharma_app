@@ -9,7 +9,7 @@ class QRCodeService {
   /// Récupère le QR code du patient (données complètes)
   Future<ApiResponse<QRCodeModel>> getPatientQRCode(String userId) async {
     try {
-      final response = await _dio.get('/api/v1/patients/$userId/qrcode');
+      final response = await _dio.get('/patients/$userId/qrcode');
 
       if (response.statusCode == 200 && response.data != null) {
         final qrCodeModel = QRCodeModel.fromJson(
@@ -40,9 +40,7 @@ class QRCodeService {
   /// Récupère le profil complet du patient à partir du QR code (pour pharmacien)
   Future<ApiResponse<QRCodeModel>> scanPatientQRCode(String userId) async {
     try {
-      final response = await _dio.get(
-        '/api/v1/pharmaciens/patients/$userId/profile',
-      );
+      final response = await _dio.get('/pharmaciens/patients/$userId/profile');
 
       if (response.statusCode == 200 && response.data != null) {
         final qrCodeModel = QRCodeModel.fromJson(

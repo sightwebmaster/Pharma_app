@@ -18,12 +18,22 @@ class _PatientQRCodeWidgetState extends State<PatientQRCodeWidget> {
   bool _isLoading = false;
   String? _error;
 
+  @override
+  void initState() {
+    super.initState();
+    // Charger le QR code automatiquement au chargement du widget
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadQRCode();
+    });
+  }
+
   void _loadQRCode() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
+    // D'abord, essayer de récupérer le QR code depuis le backend
     final response = await _qrcodeService.getPatientQRCode(widget.userId);
 
     if (response.success && response.data != null) {
@@ -32,9 +42,12 @@ class _PatientQRCodeWidgetState extends State<PatientQRCodeWidget> {
         _isLoading = false;
       });
     } else {
+      // Si le backend ne le supporte pas, utiliser l'ID utilisateur directement
+      // Le QR code contient simplement l'ID pour que les autres puissent le scanner
       setState(() {
-        _error = response.message ?? 'Erreur lors de la génération du QR code';
+        _qrData = widget.userId;
         _isLoading = false;
+        _error = null; // Pas d'erreur - c'est intentionnel
       });
     }
   }
@@ -113,12 +126,60 @@ class _PatientQRCodeWidgetState extends State<PatientQRCodeWidget> {
             style: TextStyle(fontSize: 12, color: AppColors.grey),
           ),
           const SizedBox(height: 16),
+          // Afficher le QR code si chargé
+          if (_isLoading)
+            const Center(
+              child: SizedBox(
+                height: 250,
+                width: 250,
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_error != null)
+            Center(
+              child: SizedBox(
+                height: 250,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadQRCode,
+                      child: const Text('Réessayer'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (_qrData != null)
+            Center(
+              child: QrImageView(
+                data: _qrData!,
+                version: QrVersions.auto,
+                size: 250,
+                gapless: false,
+              ),
+            )
+          else
+            const Center(
+              child: SizedBox(
+                height: 250,
+                width: 250,
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _showQRCodeDialog,
               icon: const Icon(Icons.visibility),
-              label: const Text('Afficher mon QR Code'),
+              label: const Text('Afficher en plein écran'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryBlue,
                 foregroundColor: AppColors.white,

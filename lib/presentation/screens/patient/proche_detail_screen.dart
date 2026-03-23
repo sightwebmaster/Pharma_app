@@ -23,20 +23,22 @@ class _ProcheDetailScreenState extends State<ProcheDetailScreen> {
   void initState() {
     super.initState();
     _viewModel = context.read<ProcheDetailViewModel>();
-    _getUserId();
-    _loadData();
+    _loadAllData();
   }
 
-  void _getUserId() async {
+  void _loadAllData() async {
+    // Get userId first
     final storage = StorageService();
     final userId = storage.getUserId();
-    setState(() {
-      _userId = userId!;
-    });
-  }
 
-  void _loadData() async {
-    await _viewModel.loadAllProcheData(_userId, widget.proche.id);
+    if (userId != null) {
+      setState(() {
+        _userId = userId;
+      });
+
+      // Then load proche data
+      await _viewModel.loadAllProcheData(userId, widget.proche.id);
+    }
   }
 
   @override
@@ -60,7 +62,7 @@ class _ProcheDetailScreenState extends State<ProcheDetailScreen> {
                   Text(viewModel.error!),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _loadData,
+                    onPressed: _loadAllData,
                     child: const Text('Réessayer'),
                   ),
                 ],
@@ -90,30 +92,134 @@ class _ProcheDetailScreenState extends State<ProcheDetailScreen> {
                         'Relation: ${widget.proche.relation}',
                         style: const TextStyle(fontSize: 14),
                       ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: widget.proche.status == 'observant'
-                              ? Colors.green
-                              : widget.proche.status == 'à surveiller'
-                              ? Colors.orange
-                              : widget.proche.status == 'rappel nécessaire'
-                              ? Colors.red
-                              : AppColors.primaryBlue,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          widget.proche.status ?? 'Non défini',
-                          style: const TextStyle(
-                            color: AppColors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                      const SizedBox(height: 12),
+
+                      // Medical Information Section
+                      Column(
+                        children: [
+                          if (viewModel.procheDetails != null) ...[
+                            // Groupe sanguin
+                            if (viewModel.procheDetails?['groupeSanguin'] !=
+                                null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Groupe sanguin:',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Text(
+                                      viewModel
+                                              .procheDetails?['groupeSanguin'] ??
+                                          'N/A',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: AppColors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            // Date de naissance
+                            if (viewModel.procheDetails?['dateNaissance'] !=
+                                null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Date de naissance:',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Text(
+                                      viewModel
+                                              .procheDetails?['dateNaissance'] ??
+                                          'N/A',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: AppColors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            // Allergies
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Allergies:',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    (viewModel.procheDetails?['allergies']
+                                                    as List?)
+                                                ?.isEmpty ??
+                                            true
+                                        ? 'Aucune'
+                                        : (viewModel.procheDetails?['allergies']
+                                                      as List?)
+                                                  ?.join(', ') ??
+                                              'N/A',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Maladies chroniques
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Maladies chroniques:',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  (viewModel.procheDetails?['maladiesChroniques']
+                                                  as List?)
+                                              ?.isEmpty ??
+                                          true
+                                      ? 'Aucune'
+                                      : (viewModel.procheDetails?['maladiesChroniques']
+                                                    as List?)
+                                                ?.join(', ') ??
+                                            'N/A',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -208,174 +314,64 @@ class _ProcheDetailScreenState extends State<ProcheDetailScreen> {
   }
 
   Widget _buildTraitementsTab(ProcheDetailViewModel viewModel) {
-    if (viewModel.traitements.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Column(
-          children: [
-            Icon(Icons.medication_outlined, size: 64, color: AppColors.grey),
-            const SizedBox(height: 16),
-            const Text(
-              'Aucun traitement en cours',
-              style: TextStyle(fontSize: 16, color: AppColors.grey),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: viewModel.traitements.length,
-      itemBuilder: (context, index) {
-        final traitement = viewModel.traitements[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        traitement.medicament,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: traitement.statut == 'en cours'
-                            ? Colors.green
-                            : traitement.statut == 'terminé'
-                            ? Colors.grey
-                            : Colors.orange,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        traitement.statut,
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Dosage: ${traitement.dosage}',
-                  style: const TextStyle(color: AppColors.grey),
-                ),
-                Text(
-                  'Fréquence: ${traitement.frequence}',
-                  style: const TextStyle(color: AppColors.grey),
-                ),
-                if (traitement.notes != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Notes: ${traitement.notes}',
-                      style: const TextStyle(
-                        color: AppColors.grey,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Column(
+        children: [
+          Icon(Icons.medication_outlined, size: 64, color: AppColors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            'Traitements',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Bientôt disponible',
+            style: TextStyle(fontSize: 14, color: AppColors.grey),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Cette fonctionnalité sera disponible prochainement via le service prescription.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.grey,
+              fontStyle: FontStyle.italic,
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
   Widget _buildHistoriqueTab(ProcheDetailViewModel viewModel) {
-    if (viewModel.historique.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Column(
-          children: [
-            Icon(Icons.history, size: 64, color: AppColors.grey),
-            const SizedBox(height: 16),
-            const Text(
-              'Aucun historique',
-              style: TextStyle(fontSize: 16, color: AppColors.grey),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: viewModel.historique.length,
-      itemBuilder: (context, index) {
-        final item = viewModel.historique[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      item.date,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryBlue,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        item.type,
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  item.detail,
-                  style: const TextStyle(color: AppColors.grey),
-                ),
-                if (item.diagnostic != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Diagnostic: ${item.diagnostic}',
-                      style: const TextStyle(color: AppColors.grey),
-                    ),
-                  ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Column(
+        children: [
+          Icon(Icons.history, size: 64, color: AppColors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            'Historique',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Bientôt disponible',
+            style: TextStyle(fontSize: 14, color: AppColors.grey),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Cette fonctionnalité sera disponible prochainement.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.grey,
+              fontStyle: FontStyle.italic,
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

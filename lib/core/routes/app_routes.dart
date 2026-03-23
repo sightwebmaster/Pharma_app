@@ -22,7 +22,6 @@ class AppRoutes {
     signup: (context) => const SignupScreen(),
     patientDashboard: (context) => const PatientDashboard(),
     pharmacienDashboard: (context) => const PharmacienDashboard(),
-    addProche: (context) => const AddProcheScreen(),
     pharmacienQRScanner: (context) => const PharmacienQRScannerScreen(),
   };
 

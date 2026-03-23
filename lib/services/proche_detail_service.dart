@@ -8,14 +8,15 @@ import 'api_client.dart';
 class ProcheDetailService {
   final Dio _dio = ApiClient().dio;
 
-  /// Récupère les détails complets d'un proche (profil + historique + traitements)
+  /// Récupère les détails complets d'un proche (profil médical)
+  /// Endpoint: GET /patients/{userId}/proches/{procheId}/profil
   Future<ApiResponse<Map<String, dynamic>>> getProcheDetails(
     String userId,
     String procheId,
   ) async {
     try {
       final response = await _dio.get(
-        '${ApiConfig.patientProchesEndpoint}/$procheId',
+        '/patients/$userId/proches/$procheId/profil',
       );
 
       if (response.statusCode == 200 && response.data != null) {
@@ -43,35 +44,19 @@ class ProcheDetailService {
   }
 
   /// Récupère l'historique médical d'un proche
+  /// NOTE: Pas encore implémenté dans le backend
+  /// Sera disponible via prescription-service
   Future<ApiResponse<List<HistoriqueModel>>> getProcheHistorique(
     String userId,
     String procheId,
   ) async {
     try {
-      final response = await _dio.get(
-        '${ApiConfig.patientProchesEndpoint}/$procheId/historique',
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        final List<dynamic> data = response.data['data'] ?? response.data;
-        final historique = data
-            .map(
-              (item) => HistoriqueModel.fromJson(item as Map<String, dynamic>),
-            )
-            .toList();
-        return ApiResponse.success(
-          data: historique,
-          message: 'Historique récupéré',
-          statusCode: response.statusCode,
-        );
-      }
-
-      return ApiResponse.error(message: 'Historique non trouvé');
-    } on DioException catch (e) {
-      return ApiResponse.error(
-        message: e.message ?? 'Erreur lors de la récupération de l\'historique',
-        statusCode: e.response?.statusCode,
-        error: e,
+      // Pour maintenant, retourner une liste vide avec un message
+      // Quand prescription-service est prêt: GET /api/v1/ordonnances/patient/{procheUserId}
+      return ApiResponse.success(
+        data: [],
+        message: 'Historique - Bientôt disponible',
+        statusCode: 200,
       );
     } catch (e) {
       return ApiResponse.error(
@@ -82,35 +67,19 @@ class ProcheDetailService {
   }
 
   /// Récupère les traitements courants d'un proche
+  /// NOTE: Pas encore implémenté dans le backend
+  /// Sera disponible via prescription-service
   Future<ApiResponse<List<TraitementModel>>> getProcheTraitements(
     String userId,
     String procheId,
   ) async {
     try {
-      final response = await _dio.get(
-        '${ApiConfig.patientProchesEndpoint}/$procheId/traitements',
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        final List<dynamic> data = response.data['data'] ?? response.data;
-        final traitements = data
-            .map(
-              (item) => TraitementModel.fromJson(item as Map<String, dynamic>),
-            )
-            .toList();
-        return ApiResponse.success(
-          data: traitements,
-          message: 'Traitements récupérés',
-          statusCode: response.statusCode,
-        );
-      }
-
-      return ApiResponse.error(message: 'Traitements non trouvés');
-    } on DioException catch (e) {
-      return ApiResponse.error(
-        message: e.message ?? 'Erreur lors de la récupération des traitements',
-        statusCode: e.response?.statusCode,
-        error: e,
+      // Pour maintenant, retourner une liste vide avec un message
+      // Quand prescription-service est prêt: GET /api/v1/prescriptions/patient/{procheUserId}
+      return ApiResponse.success(
+        data: [],
+        message: 'Traitements - Bientôt disponible',
+        statusCode: 200,
       );
     } catch (e) {
       return ApiResponse.error(

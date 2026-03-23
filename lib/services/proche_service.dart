@@ -3,14 +3,23 @@ import '../core/config/api_config.dart';
 import '../data/models/api_response_model.dart';
 import '../data/models/proche_model.dart';
 import 'api_client.dart';
+import 'storage_service.dart';
 
 class ProcheService {
   final Dio _dio = ApiClient().dio;
+  final StorageService _storage = StorageService();
 
   /// Get all family members (proches) for the current patient
   Future<ApiResponse<List<ProcheModel>>> getMyProches() async {
     try {
-      final response = await _dio.get(ApiConfig.patientProchesEndpoint);
+      // Récupérer l'userId depuis le storage (comme dans AddProcheService)
+      final userId = _storage.getUserId();
+      if (userId == null) {
+        return ApiResponse.error(message: 'Utilisateur non connecté');
+      }
+
+      // Utiliser le bon endpoint avec l'userId
+      final response = await _dio.get('/patients/$userId/proches');
       final List<dynamic> data = response.data as List<dynamic>;
       final proches = data
           .map((e) => ProcheModel.fromJson(e as Map<String, dynamic>))
