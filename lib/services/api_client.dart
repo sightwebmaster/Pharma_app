@@ -1,68 +1,115 @@
-import 'package:dio/dio.dart';
+﻿import 'package:dio/dio.dart';
 import '../core/config/api_config.dart';
 import 'storage_service.dart';
+import 'auth_service.dart';
 
+/// ApiClient — singleton Dio avec deux instances :
+///
+/// [dio]     → Gateway (port 8085) — JWT injecté automatiquement
+///             Utiliser pour TOUS les endpoints métier
+///
+/// [authDio] → user-service direct (port 8083) — PAS de JWT
+///             Utiliser UNIQUEMENT pour login et register
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
   ApiClient._internal();
 
   late Dio _dio;
+  late Dio _authDio;
+
   final StorageService _storage = StorageService();
 
+  /// Dio principal — Gateway port 8085 — JWT requis
   Dio get dio => _dio;
 
+  /// Dio auth — user-service port 8083 — PAS de JWT
+  /// Utiliser pour : loginEndpoint, registerEndpoint
+  Dio get authDio => _authDio;
+
   void init() {
+    // ── Dio principal (Gateway) ──────────────────────────────────
     _dio = Dio(
       BaseOptions(
-        baseUrl: ApiConfig.baseUrl,
+        baseUrl: ApiConfig.baseUrl, // http://localhost:8085
         connectTimeout: ApiConfig.connectTimeout,
         receiveTimeout: ApiConfig.receiveTimeout,
         headers: ApiConfig.defaultHeaders,
       ),
     );
-
-    // Ajouter les intercepteurs
     _dio.interceptors.add(_authInterceptor());
     _dio.interceptors.add(_loggingInterceptor());
     _dio.interceptors.add(_errorInterceptor());
+
+    // ── Dio auth (user-service direct) ──────────────────────────
+    // PAS d'intercepteur JWT — login/register n'ont pas de token
+    _authDio = Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.authBaseUrl, // http://localhost:8083
+        connectTimeout: ApiConfig.connectTimeout,
+        receiveTimeout: ApiConfig.receiveTimeout,
+        headers: ApiConfig.defaultHeaders,
+      ),
+    );
+    _authDio.interceptors.add(_loggingInterceptor());
+    _authDio.interceptors.add(_errorInterceptor());
   }
 
-  // ===== INTERCEPTEUR D'AUTHENTIFICATION =====
-  // Ajoute automatiquement le token JWT à chaque requête
+  // ═══════════════════════════════════════════════════════════════
+  // INTERCEPTEUR JWT — injecte le token dans chaque requête
+  // ═══════════════════════════════════════════════════════════════
 
   Interceptor _authInterceptor() {
     return InterceptorsWrapper(
       onRequest: (options, handler) async {
-        // Récupérer le token
         final token = await _storage.getAccessToken();
 
-        // Ajouter dans le header si existe
         if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
         }
 
+        // NE PAS ajouter X-User-Id manuellement
+        // Le Gateway extrait sub + roles du JWT et les propage automatiquement
+
         return handler.next(options);
       },
+
       onError: (DioException error, handler) async {
-        // Si erreur 401 (Unauthorized), essayer de rafraîchir le token
-        if (error.response?.statusCode == 401) {
-          // TODO: Implémenter la logique de refresh token
-          // Pour l'instant, on laisse passer l'erreur
+        // Token expiré → ré-authentification automatique
+        if (error.response?.statusCode == 401 && error.requestOptions.extra['isRetry'] != true) {
+          error.requestOptions.extra['isRetry'] = true;
+          try {
+            final authService = AuthService();
+            final result = await authService.refreshToken();
+
+            if (result.success) {
+              final newToken = await _storage.getAccessToken();
+              if (newToken != null && newToken.isNotEmpty) {
+                // Rejouer la requête originale avec le nouveau token
+                final opts = error.requestOptions;
+                opts.headers['Authorization'] = 'Bearer $newToken';
+                final response = await _dio.fetch(opts);
+                return handler.resolve(response);
+              }
+            }
+          } catch (e) {
+            // Refresh échoué → laisser l'erreur 401 remonter
+            // L'UI doit rediriger vers l'écran de login
+          }
         }
         return handler.next(error);
       },
     );
   }
 
-  // ===== INTERCEPTEUR DE LOGGING =====
-  // Affiche les requêtes/réponses dans la console (debug)
+  // ═══════════════════════════════════════════════════════════════
+  // INTERCEPTEUR LOGGING — debug console
+  // ═══════════════════════════════════════════════════════════════
 
   Interceptor _loggingInterceptor() {
     return InterceptorsWrapper(
       onRequest: (options, handler) {
-        print('🔵 REQUEST[${options.method}] => PATH: ${options.path}');
-        print('🔵 Headers: ${options.headers}');
+        print('🔵 [${options.method}] ${options.baseUrl}${options.path}');
         if (options.data != null) {
           print('🔵 Body: ${options.data}');
         }
@@ -70,14 +117,13 @@ class ApiClient {
       },
       onResponse: (response, handler) {
         print(
-          '🟢 RESPONSE[${response.statusCode}] => PATH: ${response.requestOptions.path}',
+          '🟢 [${response.statusCode}] ${response.requestOptions.path}',
         );
-        print('🟢 Data: ${response.data}');
         return handler.next(response);
       },
       onError: (error, handler) {
         print(
-          '🔴 ERROR[${error.response?.statusCode}] => PATH: ${error.requestOptions.path}',
+          '🔴 [${error.response?.statusCode}] ${error.requestOptions.path}',
         );
         print('🔴 Message: ${error.message}');
         if (error.response?.data != null) {
@@ -88,53 +134,61 @@ class ApiClient {
     );
   }
 
-  // ===== INTERCEPTEUR DE GESTION D'ERREURS =====
+  // ═══════════════════════════════════════════════════════════════
+  // INTERCEPTEUR ERREURS — messages lisibles
+  // ═══════════════════════════════════════════════════════════════
 
   Interceptor _errorInterceptor() {
     return InterceptorsWrapper(
       onError: (DioException error, handler) {
-        String errorMessage = 'Une erreur est survenue';
+        String message;
 
-        if (error.type == DioExceptionType.connectionTimeout) {
-          errorMessage =
-              'Connexion timeout - Vérifiez votre connexion internet';
-        } else if (error.type == DioExceptionType.receiveTimeout) {
-          errorMessage =
-              'Réception timeout - Le serveur met trop de temps à répondre';
-        } else if (error.type == DioExceptionType.badResponse) {
-          // Erreur de réponse HTTP
-          final statusCode = error.response?.statusCode;
-          final responseData = error.response?.data;
+        switch (error.type) {
+          case DioExceptionType.connectionTimeout:
+            message = 'Timeout de connexion — vérifiez votre réseau';
+            break;
+          case DioExceptionType.receiveTimeout:
+            message = 'Le serveur met trop de temps à répondre';
+            break;
+          case DioExceptionType.cancel:
+            message = 'Requête annulée';
+            break;
+          case DioExceptionType.unknown:
+            message = 'Pas de connexion internet';
+            break;
+          case DioExceptionType.badResponse:
+            final status = error.response?.statusCode;
+            final data = error.response?.data;
+            final serverMsg = data is Map ? data['message'] : null;
 
-          if (statusCode == 400) {
-            errorMessage =
-                responseData is Map && responseData['message'] != null
-                ? responseData['message']
-                : 'Données invalides';
-          } else if (statusCode == 401) {
-            errorMessage = 'Non autorisé - Veuillez vous reconnecter';
-          } else if (statusCode == 403) {
-            errorMessage = 'Accès interdit';
-          } else if (statusCode == 404) {
-            errorMessage = 'Ressource non trouvée';
-          } else if (statusCode == 500) {
-            errorMessage = 'Erreur serveur - Veuillez réessayer plus tard';
-          } else {
-            errorMessage =
-                responseData is Map && responseData['message'] != null
-                ? responseData['message']
-                : 'Erreur serveur (${statusCode ?? 'unknown'})';
-          }
-        } else if (error.type == DioExceptionType.cancel) {
-          errorMessage = 'Requête annulée';
-        } else if (error.type == DioExceptionType.unknown) {
-          errorMessage = 'Pas de connexion internet';
+            switch (status) {
+              case 400:
+                message = serverMsg ?? 'Données invalides';
+                break;
+              case 401:
+                message = 'Session expirée — reconnectez-vous';
+                break;
+              case 403:
+                message = 'Accès refusé — rôle insuffisant';
+                break;
+              case 404:
+                message = serverMsg ?? 'Ressource introuvable';
+                break;
+              case 409:
+                message = serverMsg ?? 'Conflit — données existantes';
+                break;
+              case 500:
+                message = 'Erreur serveur — réessayez plus tard';
+                break;
+              default:
+                message = serverMsg ?? 'Erreur ($status)';
+            }
+            break;
+          default:
+            message = 'Erreur inconnue';
         }
 
-        // Créer une erreur personnalisée avec le message
-        final customError = error.copyWith(message: errorMessage);
-
-        return handler.next(customError);
+        return handler.next(error.copyWith(message: message));
       },
     );
   }

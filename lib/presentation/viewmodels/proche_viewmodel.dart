@@ -1,95 +1,140 @@
-import 'package:flutter/foundation.dart';
-import '../../services/proche_service.dart';
 
+// ─────────────────────────────────────────────────────────────
+// FICHIER 2 : proche_viewmodel.dart
+// ─────────────────────────────────────────────────────────────
+ 
+import 'package:flutter/foundation.dart';
+import '../../data/models/proche_model.dart';
+import '../../services/proche_service.dart';
+ 
 class ProcheViewModel extends ChangeNotifier {
   final ProcheService _service = ProcheService();
-
-  // Stored as Map for direct compatibility with existing UI widget builders
-  List<Map<String, dynamic>> _proches = [];
+ 
+  List<ProcheModel> _proches = [];  // ✅ ProcheModel au lieu de Map
   bool _isLoading = false;
   String? _error;
-
-  List<Map<String, dynamic>> get proches => _proches;
+ 
+  List<ProcheModel> get proches => _proches;
   bool get isLoading => _isLoading;
   String? get error => _error;
-
-  /// Load all proches (family members) from the API
+  bool get hasError => _error != null;
+  bool get isEmpty => _proches.isEmpty && !_isLoading;
+ 
+  // ═══════════════════════════════════════════════════════════════
+  // LOAD
+  // ═══════════════════════════════════════════════════════════════
+ 
   Future<void> loadProches() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
-
+ 
     final response = await _service.getMyProches();
-
+ 
     if (response.success && response.data != null) {
-      _proches = response.data!.map((p) => p.toMap()).toList();
+      _proches = response.data!;
       _error = null;
     } else {
-      _error = response.message;
+      _error = response.message ?? 'Erreur chargement proches';
     }
-
+ 
     _isLoading = false;
     notifyListeners();
   }
-
-  /// Add a new proche (link to an existing patient account)
-  ///
-  /// Returns true if successful, false otherwise
-  Future<bool> addProche({
-    required String patientId,
+ 
+  // ═══════════════════════════════════════════════════════════════
+  // ADD PAR EMAIL
+  // ✅ Utilise addProcheByEmail (endpoint correct)
+  // ❌ ÉTAIT : addProche(patientId, relation) → mauvais endpoint
+  // ═══════════════════════════════════════════════════════════════
+ 
+  Future<bool> addProcheByEmail({
+    required String email,
     required String relation,
   }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
-
-    final response = await _service.addProche(
-      patientId: patientId,
+ 
+    final response = await _service.addProcheByEmail(
+      email: email,
       relation: relation,
     );
-
+ 
+    _isLoading = false;
+ 
     if (response.success && response.data != null) {
-      // Add the newly created proche to the list
-      _proches.add(response.data!.toMap());
+      _proches.add(response.data!);
       _error = null;
-      _isLoading = false;
       notifyListeners();
       return true;
     } else {
-      _error = response.message;
-      _isLoading = false;
+      _error = response.message ?? 'Erreur ajout proche';
       notifyListeners();
       return false;
     }
   }
-
-  /// Delete a proche (unlink the patient relationship)
-  ///
-  /// Returns true if successful, false otherwise
+ 
+  // ═══════════════════════════════════════════════════════════════
+  // ADD PAR QR CODE
+  // ✅ Nouveau — utilise addProcheByQrCode
+  // ═══════════════════════════════════════════════════════════════
+ 
+  Future<bool> addProcheByQrCode({
+    required String qrCodeContent,
+    required String relation,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+ 
+    final response = await _service.addProcheByQrCode(
+      qrCodeContent: qrCodeContent,
+      relation: relation,
+    );
+ 
+    _isLoading = false;
+ 
+    if (response.success && response.data != null) {
+      _proches.add(response.data!);
+      _error = null;
+      notifyListeners();
+      return true;
+    } else {
+      _error = response.message ?? 'Erreur ajout proche par QR';
+      notifyListeners();
+      return false;
+    }
+  }
+ 
+  // ═══════════════════════════════════════════════════════════════
+  // DELETE
+  // ═══════════════════════════════════════════════════════════════
+ 
   Future<bool> deleteProche(String procheId) async {
     final response = await _service.deleteProche(procheId);
-
+ 
     if (response.success) {
-      // Remove from local list
-      _proches.removeWhere((p) => p['id'] == procheId);
+      // ✅ Supprime par id depuis la liste de ProcheModel
+      _proches.removeWhere((p) => p.id == procheId);
       _error = null;
       notifyListeners();
       return true;
     } else {
-      _error = response.message;
+      _error = response.message ?? 'Erreur suppression proche';
       notifyListeners();
       return false;
     }
   }
-
-  /// Clear error message
+ 
+  // ═══════════════════════════════════════════════════════════════
+  // HELPERS
+  // ═══════════════════════════════════════════════════════════════
+ 
   void clearError() {
     _error = null;
     notifyListeners();
   }
-
-  /// Refresh proches list (alias for loadProches for clarity)
-  Future<void> refresh() async {
-    await loadProches();
-  }
+ 
+  Future<void> refresh() => loadProches();
 }

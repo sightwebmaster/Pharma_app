@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../presentation/viewmodels/auth_viewmodel.dart';
-import '../../../presentation/viewmodels/pharmacien_viewmodel.dart';
+import 'package:pharma_app/core/constants/app_colors.dart';
+import 'package:pharma_app/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:pharma_app/presentation/viewmodels/pharmacien_viewmodel.dart';
+import 'package:pharma_app/core/routes/app_routes.dart';
 
 class PharmacienDashboard extends StatefulWidget {
   const PharmacienDashboard({super.key});
@@ -16,6 +17,22 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
 
   Map<String, dynamic>? _scannedPatient;
   String _searchQuery = '';
+  String _buildPatientSubtitle(Map<String, dynamic> patient) {
+    final parts = <String>[];
+
+    final maladie = patient['maladie'] as String?;
+    if (maladie != null && maladie.isNotEmpty) parts.add(maladie);
+
+    final telephone = patient['telephone'] as String?;
+    if (telephone != null && telephone.isNotEmpty) parts.add(telephone);
+
+    final groupeSanguin = patient['groupeSanguin'] as String?;
+    if (groupeSanguin != null && groupeSanguin.isNotEmpty) {
+      parts.add('Groupe: $groupeSanguin');
+    }
+
+    return parts.isNotEmpty ? parts.join(' · ') : 'Patient';
+  }
 
   @override
   void initState() {
@@ -332,13 +349,22 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // CORRECTION 2 — _buildPatientCard
+  // ❌ patient['age'] = 0, patient['maladie'] = '' → affichage vide
+  // ✅ Afficher telephone + groupeSanguin si age/maladie absents
+  // ─────────────────────────────────────────────────────────────
+
   Widget _buildPatientCard(Map<String, dynamic> patient) {
-    final observance = patient['observance'] as double;
+    final observance = patient['observance'] as double? ?? 0.0;
     Color obsColor = observance >= 0.8
         ? AppColors.primaryGreen
         : observance >= 0.5
         ? const Color(0xFFFFA726)
-        : AppColors.errorRed;
+        : AppColors.grey; // ✅ gris si 0.0 (pas encore chargé)
+
+    // ✅ Ligne de détail selon les données disponibles
+    final String subtitle = _buildPatientSubtitle(patient);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -359,7 +385,9 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
           radius: 24,
           backgroundColor: AppColors.primaryBlue.withOpacity(0.12),
           child: Text(
-            (patient['name'] as String).substring(0, 1),
+            (patient['name'] as String).isNotEmpty
+                ? (patient['name'] as String).substring(0, 1)
+                : '?',
             style: const TextStyle(
               color: AppColors.primaryBlue,
               fontWeight: FontWeight.bold,
@@ -372,7 +400,7 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         subtitle: Text(
-          '${patient['age']} ans · ${patient['maladie']}',
+          subtitle,
           style: const TextStyle(fontSize: 12, color: AppColors.grey),
         ),
         trailing: Column(
@@ -380,7 +408,9 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '${(observance * 100).toInt()}%',
+              observance > 0
+                  ? '${(observance * 100).toInt()}%'
+                  : 'N/A', // ✅ N/A si pas encore connecté à adherence-service
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -393,6 +423,13 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
             ),
           ],
         ),
+        onTap: () {
+          // ✅ Sélectionne le patient et va sur l'onglet Scanner
+          setState(() {
+            _scannedPatient = patient;
+            _selectedIndex = 1;
+          });
+        },
       ),
     );
   }
@@ -550,8 +587,20 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // CORRECTION 1 — _buildScanPatientItem
+  // ❌ patient['qrCode'] affiche tout le base64 PNG → overflow + 404
+  // ✅ Afficher seulement les 8 premiers caractères de l'userId
+  // ─────────────────────────────────────────────────────────────
+
   Widget _buildScanPatientItem(Map<String, dynamic> patient) {
     final isSelected = _scannedPatient?['name'] == patient['name'];
+    // ✅ Afficher userId tronqué au lieu du base64
+    final String patientId = patient['id'] as String? ?? '';
+    final String idDisplay = patientId.length > 8
+        ? '${patientId.substring(0, 8)}...'
+        : patientId;
+
     return GestureDetector(
       onTap: () => setState(() => _scannedPatient = patient),
       child: Container(
@@ -574,7 +623,9 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
               radius: 20,
               backgroundColor: AppColors.primaryBlue.withOpacity(0.12),
               child: Text(
-                (patient['name'] as String).substring(0, 1),
+                (patient['name'] as String).isNotEmpty
+                    ? (patient['name'] as String).substring(0, 1)
+                    : '?',
                 style: const TextStyle(
                   color: AppColors.primaryBlue,
                   fontWeight: FontWeight.bold,
@@ -595,14 +646,18 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
                     ),
                   ),
                   Text(
-                    '${patient['age']} ans · ${patient['maladie']}',
+                    // ✅ maladie peut être vide — afficher téléphone si dispo
+                    patient['telephone'] as String? ??
+                        patient['maladie'] as String? ??
+                        '',
                     style: const TextStyle(fontSize: 11, color: AppColors.grey),
                   ),
                 ],
               ),
             ),
+            // ✅ Afficher ID tronqué au lieu du base64
             Text(
-              patient['qrCode'] as String,
+              idDisplay,
               style: const TextStyle(
                 fontSize: 11,
                 color: AppColors.grey,
@@ -732,7 +787,17 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => _showPlanifierDialog(patient),
+                          onPressed: () {
+                            AppRoutes.navigateToAddMedicine(
+                              context,
+                              patientId: patient['id'] as String,
+                              patientName: patient['name'] as String,
+                              patientAge: patient['age'] as int,
+                              patientSex: patient['sex'] as String,
+                              allergies: patient['allergies'] as String,
+                              isPregnant: patient['pregnant'] as bool,
+                            );
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryGreen,
                             shape: RoundedRectangleBorder(
@@ -875,7 +940,7 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
                       _searchQuery.toLowerCase(),
                     ),
                   )
-                  .map((p) => _buildDetailedPatientCard(p))
+                  .map<Widget>((p) => _buildDetailedPatientCard(p))
                   .toList(),
             ),
           ),
@@ -884,14 +949,20 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // CORRECTION 3 — _buildDetailedPatientCard
+  // ✅ Même corrections que _buildPatientCard + bouton Planifier
+  // ─────────────────────────────────────────────────────────────
+
   Widget _buildDetailedPatientCard(Map<String, dynamic> patient) {
-    final observance = patient['observance'] as double;
+    final observance = patient['observance'] as double? ?? 0.0;
     Color obsColor = observance >= 0.8
         ? AppColors.primaryGreen
         : observance >= 0.5
         ? const Color(0xFFFFA726)
-        : AppColors.errorRed;
-    final meds = patient['meds'] as List<Map<String, dynamic>>;
+        : AppColors.grey;
+
+    final String subtitle = _buildPatientSubtitle(patient);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -916,7 +987,9 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
                   radius: 26,
                   backgroundColor: AppColors.primaryBlue.withOpacity(0.12),
                   child: Text(
-                    (patient['name'] as String).substring(0, 1),
+                    (patient['name'] as String).isNotEmpty
+                        ? (patient['name'] as String).substring(0, 1)
+                        : '?',
                     style: const TextStyle(
                       color: AppColors.primaryBlue,
                       fontWeight: FontWeight.bold,
@@ -938,7 +1011,7 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
                         ),
                       ),
                       Text(
-                        '${patient['age']} ans · ${patient['maladie']}',
+                        subtitle,
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.grey,
@@ -952,7 +1025,7 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
                               borderRadius: BorderRadius.circular(4),
                               child: LinearProgressIndicator(
                                 value: observance,
-                                backgroundColor: obsColor.withOpacity(0.15),
+                                backgroundColor: Colors.grey.withOpacity(0.15),
                                 valueColor: AlwaysStoppedAnimation(obsColor),
                                 minHeight: 6,
                               ),
@@ -960,7 +1033,9 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${(observance * 100).toInt()}%',
+                            observance > 0
+                                ? '${(observance * 100).toInt()}%'
+                                : 'N/A',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -976,40 +1051,34 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
             ),
           ),
 
-          // Médicaments
-          Container(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: Row(
-              children: meds
-                  .take(3)
-                  .map(
-                    (m) => Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryBlue.withOpacity(0.07),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          m['name'] as String,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primaryBlue,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+          // ✅ Allergies au lieu de meds vides
+          if ((patient['allergies'] as String?)?.isNotEmpty == true &&
+              patient['allergies'] != 'Aucune')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_outlined,
+                    size: 14,
+                    color: AppColors.errorRed,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Allergies: ${patient['allergies']}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.errorRed,
+                        fontWeight: FontWeight.w500,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  )
-                  .toList(),
+                  ),
+                ],
+              ),
             ),
-          ),
 
           // Actions
           Padding(
@@ -1049,7 +1118,18 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _showPlanifierDialog(patient),
+                    onPressed: () {
+                      // ✅ patient['id'] = userId Keycloak (après correction viewmodel)
+                      AppRoutes.navigateToAddMedicine(
+                        context,
+                        patientId: patient['id'] as String,
+                        patientName: patient['name'] as String,
+                        patientAge: patient['age'] as int? ?? 0,
+                        patientSex: patient['sex'] as String? ?? 'Male',
+                        allergies: patient['allergies'] as String? ?? 'Aucune',
+                        isPregnant: patient['pregnant'] as bool? ?? false,
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryGreen,
                       shape: RoundedRectangleBorder(

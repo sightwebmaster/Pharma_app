@@ -30,6 +30,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  
+  # Firebase Core (required for all Firebase services)
+  firebase_core: ^3.15.2
+  
+  # Add other Firebase services you need
+  firebase_auth: ^5.5.1           # For authentication
+  cloud_firestore: ^5.6.5         # For Firestore database
+  firebase_storage: ^12.4.4       # For file storage
+  firebase_analytics: ^11.4.4   # For analytics
+  firebase_messaging: ^15.2.4 
+    # For push notifications
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -38,6 +49,7 @@ dependencies:
 
   # Client HTTP pour les appels API
   dio: ^5.4.0
+  logger: ^2.6.2
 
   # State Management
   provider: ^6.1.1
@@ -47,7 +59,7 @@ dependencies:
   flutter_secure_storage: ^9.0.0
 
   # Serialization JSON
-  json_annotation: ^4.8.1
+  json_annotation: ^4.11.0
 
   # Utilities
   intl: ^0.19.0

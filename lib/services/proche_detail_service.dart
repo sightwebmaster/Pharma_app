@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import '../core/config/api_config.dart';
 import '../data/models/api_response_model.dart';
 import '../data/models/historique_model.dart';
 import '../data/models/traitement_model.dart';

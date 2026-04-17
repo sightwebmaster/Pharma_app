@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "419546044709",
+    "project_id": "pharma-app-notification",
+    "storage_bucket": "pharma-app-notification.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:419546044709:android:08f4567adcdb6f5c72a2cc",
+        "android_client_info": {
+          "package_name": "com.example.pharma_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAr6RTKUnzkBikeFRNNGP3rKMQZgUQCxPM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

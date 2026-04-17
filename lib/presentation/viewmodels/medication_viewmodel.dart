@@ -27,7 +27,7 @@ class MedicationViewModel extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    final response = await _service.getMyMedications();
+    final response = await _service.getPrisesAujourdhui();
 
     if (response.success && response.data != null) {
       _medications = response.data!.map((m) => m.toMap()).toList();
@@ -41,7 +41,7 @@ class MedicationViewModel extends ChangeNotifier {
   }
 
   Future<void> confirmTaken(String medicationId) async {
-    final response = await _service.confirmTaken(medicationId);
+    final response = await _service.confirmerPrise(medicationId);
     if (response.success) {
       final idx = _medications.indexWhere((m) => m['id'] == medicationId);
       if (idx != -1) {

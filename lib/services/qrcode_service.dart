@@ -67,4 +67,49 @@ class QRCodeService {
       );
     }
   }
+
+  /// Génère dynamiquement un QR code basé sur un lien de partage
+  /// [shareLink] le lien URL à encoder dans le QR code
+  /// Retourne le contenu du QR code (le lien lui-même)
+  ///
+  /// Exemple: generateShareQRCode('https://pharmaapp.com/profile/user123')
+  /// retournera le même lien (le vrai QR sera généré côté UI avec qr_flutter package)
+  Future<ApiResponse<String>> generateShareQRCode(String shareLink) async {
+    try {
+      // Valider que le lien n'est pas vide
+      if (shareLink.isEmpty) {
+        return ApiResponse.error(
+          message: 'Le lien de partage ne peut pas être vide',
+        );
+      }
+
+      // Optionnel: faire appel au backend pour valider ou générer le QR
+      // Pour l'instant, on retourne simplement le lien (sera encodé en QR côté UI)
+      return ApiResponse.success(
+        data: shareLink,
+        message: 'QR code généré avec succès',
+        statusCode: 200,
+      );
+
+      // Si vous voulez faire appel au backend:
+      // final response = await _dio.post(
+      //   '/qrcode/generate',
+      //   data: {'shareLink': shareLink},
+      // );
+      //
+      // if (response.statusCode == 200) {
+      //   final qrcode = response.data['qrcode'] ?? shareLink;
+      //   return ApiResponse.success(
+      //     data: qrcode,
+      //     message: 'QR code généré',
+      //   );
+      // }
+      // return ApiResponse.error(message: 'Erreur génération QR');
+    } catch (e) {
+      return ApiResponse.error(
+        message: 'Erreur lors de la génération du QR code: ${e.toString()}',
+        error: e,
+      );
+    }
+  }
 }

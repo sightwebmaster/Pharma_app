@@ -103,13 +103,9 @@ class AuthViewModel extends ChangeNotifier {
       email: email,
       password: password,
       telephone: telephone,
-      adresse: adresse,
-      role: role,
       groupeSanguin: groupeSanguin,
       allergies: allergies,
       maladiesChroniques: maladiesChroniques,
-      pharmacyName: pharmacyName,
-      licenseNumber: licenseNumber,
     );
 
     if (response.success && response.data != null) {

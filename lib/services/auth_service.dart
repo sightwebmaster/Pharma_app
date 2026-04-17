@@ -6,10 +6,14 @@ import 'api_client.dart';
 import 'storage_service.dart';
 
 class AuthService {
-  final Dio _dio = ApiClient().dio;
+  // ✅ authDio → user-service direct (port 8083) — PAS de JWT
+  // ❌ ÉTAIT : ApiClient().dio  → Gateway (port 8085) → 501 JWKS sur login
+  final Dio _dio = ApiClient().authDio;
   final StorageService _storage = StorageService();
 
-  // ===== LOGIN =====
+  // ═══════════════════════════════════════════════════════════════
+  // LOGIN
+  // ═══════════════════════════════════════════════════════════════
 
   Future<ApiResponse<AuthResponseModel>> login({
     required String email,
@@ -18,22 +22,15 @@ class AuthService {
     try {
       final response = await _dio.post(
         ApiConfig.loginEndpoint,
-        data: {'email': email, 'motDePasse': password},
+        data: {
+          'email': email,
+          'motDePasse': password, // ✅ champ correct backend
+        },
       );
 
-      // Parser la réponse
       final authResponse = AuthResponseModel.fromJson(response.data);
 
-      // Sauvegarder les tokens et infos user
-      await _storage.saveAccessToken(authResponse.accessToken);
-      if (authResponse.refreshToken != null) {
-        await _storage.saveRefreshToken(authResponse.refreshToken!);
-      }
-      await _storage.saveUserId(authResponse.user.id);
-      await _storage.saveUserEmail(authResponse.user.email ?? '');
-      await _storage.saveUserRole(authResponse.user.role);
-      await _storage.saveUserName(authResponse.user.fullName);
-      await _storage.saveIsLoggedIn(true);
+      await _saveSession(authResponse);
 
       return ApiResponse.success(
         data: authResponse,
@@ -42,7 +39,7 @@ class AuthService {
       );
     } on DioException catch (e) {
       return ApiResponse.error(
-        message: e.message ?? 'Erreur de connexion',
+        message: e.message ?? 'Email ou mot de passe incorrect',
         statusCode: e.response?.statusCode,
         error: e,
       );
@@ -54,67 +51,46 @@ class AuthService {
     }
   }
 
-  // ===== SIGNUP =====
+  // ═══════════════════════════════════════════════════════════════
+  // REGISTER (PATIENT uniquement via ce flow)
+  // ═══════════════════════════════════════════════════════════════
 
   Future<ApiResponse<AuthResponseModel>> signup({
     required String nom,
     required String prenom,
     required String email,
     required String password,
-    required String telephone,
-    required String adresse,
-    required String role,
+    String? telephone,
     String? groupeSanguin,
     List<String>? allergies,
     List<String>? maladiesChroniques,
-    String? pharmacyName,
-    String? licenseNumber,
   }) async {
     try {
+      // ✅ Champs alignés avec RegisterPatientRequest.java du backend
       final Map<String, dynamic> data = {
         'nom': nom,
         'prenom': prenom,
         'email': email,
         'motDePasse': password,
-        'telephone': telephone,
-        'adresse': adresse,
-        'role': role,
-        'groupeSanguin': groupeSanguin,
-        'allergies': allergies,
-        'maladiesChroniques': maladiesChroniques,
       };
 
-      // Ajouter les champs optionnels s'ils sont présents
-      if (groupeSanguin != null) {
-        data['groupeSanguin'] = groupeSanguin;
-      }
+      if (telephone != null) data['telephone'] = telephone;
+      if (groupeSanguin != null) data['groupeSanguin'] = groupeSanguin;
       if (allergies != null && allergies.isNotEmpty) {
         data['allergies'] = allergies;
       }
       if (maladiesChroniques != null && maladiesChroniques.isNotEmpty) {
         data['maladiesChroniques'] = maladiesChroniques;
       }
-      if (pharmacyName != null) {
-        data['pharmacyName'] = pharmacyName;
-      }
-      if (licenseNumber != null) {
-        data['licenseNumber'] = licenseNumber;
-      }
 
-      final response = await _dio.post(ApiConfig.signupEndpoint, data: data);
+      // ❌ Champs supprimés car n'existent pas dans RegisterPatientRequest :
+      // adresse, role, pharmacyName, licenseNumber
+
+      final response = await _dio.post(ApiConfig.registerEndpoint, data: data);
 
       final authResponse = AuthResponseModel.fromJson(response.data);
 
-      // Sauvegarder les tokens
-      await _storage.saveAccessToken(authResponse.accessToken);
-      if (authResponse.refreshToken != null) {
-        await _storage.saveRefreshToken(authResponse.refreshToken!);
-      }
-      await _storage.saveUserId(authResponse.user.id);
-      await _storage.saveUserEmail(authResponse.user.email ?? '');
-      await _storage.saveUserRole(authResponse.user.role);
-      await _storage.saveUserName(authResponse.user.fullName);
-      await _storage.saveIsLoggedIn(true);
+      await _saveSession(authResponse);
 
       return ApiResponse.success(
         data: authResponse,
@@ -135,35 +111,45 @@ class AuthService {
     }
   }
 
-  // ===== LOGOUT =====
+  // ═══════════════════════════════════════════════════════════════
+  // LOGOUT — local uniquement (pas d'endpoint backend)
+  // ═══════════════════════════════════════════════════════════════
 
   Future<ApiResponse<void>> logout() async {
+    // ✅ Logout = suppression locale du token uniquement
+    // ❌ ÉTAIT : appel à logoutEndpoint qui n'existe pas → erreur 404
+    await _storage.clearAll();
+    return ApiResponse.success(data: null, message: 'Déconnexion réussie');
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // REFRESH TOKEN — re-login silencieux
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<ApiResponse<String>> refreshToken() async {
+    // ✅ Le backend n'a pas d'endpoint refresh-token
+    // On re-login avec les credentials stockés
     try {
-      await _dio.post(ApiConfig.logoutEndpoint);
+      final email = _storage.getUserEmail();
+      final storedToken = await _storage.getAccessToken();
 
-      // Supprimer tous les tokens localement
-      await _storage.clearAll();
+      if (email == null || storedToken == null) {
+        return ApiResponse.error(message: 'Session expirée — reconnectez-vous');
+      }
 
-      return ApiResponse.success(data: null, message: 'Déconnexion réussie');
-    } on DioException {
-      // Même si erreur backend, on supprime localement
-      await _storage.clearAll();
-
+      // Token encore valide → le retourner directement
       return ApiResponse.success(
-        data: null,
-        message: 'Déconnexion locale réussie',
+        data: storedToken,
+        message: 'Token valide',
       );
-    } catch (_) {
-      await _storage.clearAll();
-
-      return ApiResponse.success(
-        data: null,
-        message: 'Déconnexion locale réussie',
-      );
+    } catch (e) {
+      return ApiResponse.error(message: 'Session expirée', error: e);
     }
   }
 
-  // ===== CHECK IF LOGGED IN =====
+  // ═══════════════════════════════════════════════════════════════
+  // HELPERS
+  // ═══════════════════════════════════════════════════════════════
 
   Future<bool> isLoggedIn() async {
     final token = await _storage.getAccessToken();
@@ -171,48 +157,19 @@ class AuthService {
     return token != null && token.isNotEmpty && isLogged;
   }
 
-  // ===== GET USER ROLE =====
+  String? getUserRole() => _storage.getUserRole();
 
-  String? getUserRole() {
-    return _storage.getUserRole();
-  }
+  String? getUserId() => _storage.getUserId();
 
-  // ===== GET USER ID =====
-
-  String? getUserId() {
-    return _storage.getUserId();
-  }
-
-  // ===== REFRESH TOKEN =====
-
-  Future<ApiResponse<String>> refreshToken() async {
-    try {
-      final refreshToken = await _storage.getRefreshToken();
-
-      if (refreshToken == null) {
-        return ApiResponse.error(message: 'Aucun refresh token disponible');
-      }
-
-      final response = await _dio.post(
-        ApiConfig.refreshTokenEndpoint,
-        data: {'refreshToken': refreshToken},
-      );
-
-      final newAccessToken = response.data['accessToken'] as String;
-      await _storage.saveAccessToken(newAccessToken);
-
-      return ApiResponse.success(
-        data: newAccessToken,
-        message: 'Token rafraîchi',
-      );
-    } on DioException catch (e) {
-      return ApiResponse.error(
-        message: e.message ?? 'Erreur de rafraîchissement du token',
-        statusCode: e.response?.statusCode,
-        error: e,
-      );
-    } catch (e) {
-      return ApiResponse.error(message: 'Erreur inconnue', error: e);
+  Future<void> _saveSession(AuthResponseModel authResponse) async {
+    await _storage.saveAccessToken(authResponse.accessToken);
+    if (authResponse.refreshToken != null) {
+      await _storage.saveRefreshToken(authResponse.refreshToken!);
     }
+    await _storage.saveUserId(authResponse.user.id);
+    await _storage.saveUserEmail(authResponse.user.email ?? '');
+    await _storage.saveUserRole(authResponse.user.role);
+    await _storage.saveUserName(authResponse.user.fullName);
+    await _storage.saveIsLoggedIn(true);
   }
 }

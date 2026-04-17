@@ -16,7 +16,6 @@ class ProcheDetailScreen extends StatefulWidget {
 
 class _ProcheDetailScreenState extends State<ProcheDetailScreen> {
   late ProcheDetailViewModel _viewModel;
-  late String _userId;
   int _selectedTab = 0;
 
   @override
@@ -32,10 +31,6 @@ class _ProcheDetailScreenState extends State<ProcheDetailScreen> {
     final userId = storage.getUserId();
 
     if (userId != null) {
-      setState(() {
-        _userId = userId;
-      });
-
       // Then load proche data
       await _viewModel.loadAllProcheData(userId, widget.proche.id);
     }

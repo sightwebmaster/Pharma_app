@@ -4,6 +4,8 @@ import 'package:pharma_app/presentation/viewmodels/pharmacien_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/proche_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/add_proche_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/proche_detail_viewmodel.dart';
+import 'package:pharma_app/presentation/viewmodels/profile_viewmodel.dart';
+import 'package:pharma_app/services/treatment_provider.dart';
 import 'package:provider/provider.dart';
 import 'core/routes/app_routes.dart';
 import 'core/themes/app_theme.dart';
@@ -37,6 +39,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProcheViewModel()),
         ChangeNotifierProvider(create: (_) => AddProcheViewModel()),
         ChangeNotifierProvider(create: (_) => ProcheDetailViewModel()),
+        ChangeNotifierProvider(create: (_) => ProfileViewModel()),
+        ChangeNotifierProvider(create: (_) => TreatmentProvider()),
       ],
       child: MaterialApp(
         title: 'Projet Pharma',
