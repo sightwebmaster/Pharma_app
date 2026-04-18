@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/constants/dropdown_constants.dart';
 import '../../../core/routes/app_routes.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 
@@ -21,13 +25,14 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPasswordController = TextEditingController();
   final _telephoneController = TextEditingController();
   final _adresseController = TextEditingController();
+  final _dateNaissanceController = TextEditingController();
 
-  String? _selectedRole;
+  String? _selectedGroupeSanguin;
+  final List<String> _selectedAllergies = [];
+  final List<String> _selectedMaladiesChroniques = [];
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-
-  final List<String> _roles = [AppStrings.patient, AppStrings.pharmacien];
 
   @override
   void dispose() {
@@ -38,35 +43,82 @@ class _SignupScreenState extends State<SignupScreen> {
     _confirmPasswordController.dispose();
     _telephoneController.dispose();
     _adresseController.dispose();
+    _dateNaissanceController.dispose();
     super.dispose();
   }
 
-  void _signup() {
-    if (_formKey.currentState!.validate() && _selectedRole != null) {
-      setState(() => _isLoading = true);
-      
-      // Simuler une inscription (à remplacer par votre logique d'authentification)
-      Future.delayed(const Duration(seconds: 2), () {
-        setState(() => _isLoading = false);
-        
-        // Rediriger vers le dashboard selon le rôle
-        if (_selectedRole == AppStrings.patient) {
-          Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
-        } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.pharmacienDashboard);
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Inscription réussie! Bienvenue ${_prenomController.text}'),
-            backgroundColor: AppColors.primaryGreen,
-          ),
-        );
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _dateNaissanceController.text =
+            '${picked.day}/${picked.month}/${picked.year}';
       });
-    } else if (_selectedRole == null) {
+    }
+  }
+
+  void _signup() async {
+    if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez sélectionner un rôle'),
+          content: Text('Veuillez remplir tous les champs correctement'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Les mots de passe ne correspondent pas'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+
+    final success = await authViewModel.signup(
+      nom: _nomController.text.trim(),
+      prenom: _prenomController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      telephone: _telephoneController.text.trim(),
+      adresse: _adresseController.text.trim(),
+      role: AppStrings.patient,
+      dateNaissance: _dateNaissanceController.text.trim().isEmpty
+          ? null
+          : DateFormat('d/M/yyyy').parse(_dateNaissanceController.text.trim()),
+      groupeSanguin: _selectedGroupeSanguin,
+      allergies: _selectedAllergies,
+      maladiesChroniques: _selectedMaladiesChroniques,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Inscription réussie! Bienvenue ${_prenomController.text}',
+          ),
+          backgroundColor: AppColors.primaryGreen,
+        ),
+      );
+      Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authViewModel.errorMessage ?? 'Erreur d\'inscription'),
           backgroundColor: AppColors.errorRed,
         ),
       );
@@ -102,20 +154,14 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 8),
                 const Text(
                   'Rejoignez notre plateforme de gestion pharmaceutique',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.grey,
-                  ),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey),
                 ),
                 const SizedBox(height: 30),
 
                 // Champ Nom
                 const Text(
                   'Nom',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -134,10 +180,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Prénom
                 const Text(
                   'Prénom',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -156,10 +199,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Email
                 const Text(
                   'Email',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -181,10 +221,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Téléphone
                 const Text(
                   'Téléphone',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -206,10 +243,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Adresse
                 const Text(
                   'Adresse',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
@@ -225,13 +259,42 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Sélection du Rôle
+                // Champ Date de naissance
                 const Text(
-                  'Vous êtes :',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                  'Date de naissance',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _selectDate,
+                  child: TextFormField(
+                    controller: _dateNaissanceController,
+                    enabled: false,
+                    decoration: InputDecoration(
+                      hintText: 'JJ/MM/AAAA',
+                      prefixIcon: const Icon(
+                        Icons.calendar_today,
+                        color: AppColors.primaryBlue,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.lightGrey,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
                   ),
+                ),
+                const SizedBox(height: 16),
+
+                // Groupe sanguin
+                const Text(
+                  'Groupe sanguin',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -240,44 +303,89 @@ class _SignupScreenState extends State<SignupScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: DropdownButtonFormField<String>(
-                    value: _selectedRole,
-                    hint: const Text('Sélectionnez votre rôle'),
-                    icon: const Icon(Icons.arrow_drop_down),
+                    initialValue: _selectedGroupeSanguin,
+                    hint: const Text('Sélectionnez votre groupe sanguin'),
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(horizontal: 16),
                     ),
-                    items: _roles.map((String role) {
+                    items: DropdownConstants.groupesSanguins.map((
+                      String value,
+                    ) {
                       return DropdownMenuItem<String>(
-                        value: role,
-                        child: Row(
-                          children: [
-                            Icon(
-                              role == AppStrings.patient 
-                                  ? Icons.person 
-                                  : Icons.local_pharmacy,
-                              color: role == AppStrings.patient 
-                                  ? AppColors.primaryBlue 
-                                  : AppColors.primaryGreen,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(role),
-                          ],
-                        ),
+                        value: value,
+                        child: Text(value),
                       );
                     }).toList(),
                     onChanged: (String? newValue) {
                       setState(() {
-                        _selectedRole = newValue;
+                        _selectedGroupeSanguin = newValue;
                       });
                     },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Le rôle est requis';
-                      }
-                      return null;
-                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Allergies (Multi-select)
+                const Text(
+                  'Allergies',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: DropdownConstants.allergies.map((String allergy) {
+                      return CheckboxListTile(
+                        title: Text(allergy),
+                        value: _selectedAllergies.contains(allergy),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedAllergies.add(allergy);
+                            } else {
+                              _selectedAllergies.remove(allergy);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Maladies chroniques (Multi-select)
+                const Text(
+                  'Maladies chroniques',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: DropdownConstants.maladiesChroniques.map((
+                      String maladie,
+                    ) {
+                      return CheckboxListTile(
+                        title: Text(maladie),
+                        value: _selectedMaladiesChroniques.contains(maladie),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedMaladiesChroniques.add(maladie);
+                            } else {
+                              _selectedMaladiesChroniques.remove(maladie);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -285,10 +393,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Mot de passe
                 const Text(
                   'Mot de passe',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -296,10 +401,15 @@ class _SignupScreenState extends State<SignupScreen> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     hintText: 'Minimum 8 caractères',
-                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryBlue),
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      color: AppColors.primaryBlue,
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                         color: AppColors.grey,
                       ),
                       onPressed: () {
@@ -314,7 +424,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     filled: true,
                     fillColor: AppColors.lightGrey,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -331,10 +444,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Champ Confirmer mot de passe
                 const Text(
                   'Confirmer le mot de passe',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -342,10 +452,15 @@ class _SignupScreenState extends State<SignupScreen> {
                   obscureText: _obscureConfirmPassword,
                   decoration: InputDecoration(
                     hintText: 'Retapez votre mot de passe',
-                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryBlue),
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      color: AppColors.primaryBlue,
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                        _obscureConfirmPassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                         color: AppColors.grey,
                       ),
                       onPressed: () {
@@ -360,7 +475,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     filled: true,
                     fillColor: AppColors.lightGrey,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -392,7 +510,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     GestureDetector(
                       onTap: () {
-                        Navigator.pushReplacementNamed(context, AppRoutes.login);
+                        Navigator.pushReplacementNamed(
+                          context,
+                          AppRoutes.login,
+                        );
                       },
                       child: const Text(
                         'Se connecter',
