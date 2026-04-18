@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "419546044709",
-    "project_id": "pharma-app-notification",
-    "storage_bucket": "pharma-app-notification.firebasestorage.app"
+    "project_number": "676148629872",
+    "project_id": "pharmacare-c59ab",
+    "storage_bucket": "pharmacare-c59ab.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:419546044709:android:08f4567adcdb6f5c72a2cc",
+        "mobilesdk_app_id": "1:676148629872:android:124b94999aee099daeffb5",
         "android_client_info": {
           "package_name": "com.example.pharma_app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAr6RTKUnzkBikeFRNNGP3rKMQZgUQCxPM"
+          "current_key": "AIzaSyAZTjzsTK2FwdlWfoWDT0tnvCW3Mpavv1E"
         }
       ],
       "services": {

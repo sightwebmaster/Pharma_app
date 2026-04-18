@@ -41,6 +41,8 @@ dependencies:
   firebase_analytics: ^11.4.4   # For analytics
   firebase_messaging: ^15.2.4 
     # For push notifications
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

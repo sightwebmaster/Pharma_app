@@ -7,7 +7,6 @@ import 'package:pharma_app/presentation/widgets/common/app_card.dart';
 import 'package:pharma_app/presentation/widgets/common/icon_circle.dart';
 import 'package:pharma_app/presentation/widgets/illustrations/medicine_illustration.dart';
 import 'package:pharma_app/services/treatment_provider.dart';
-import 'package:pharma_app/services/storage_service.dart';
 import 'package:pharma_app/data/models/prise_planifiee.dart';
 
 /// MedicineReminderCard - Card "Did you take your Medicine?"
@@ -49,31 +48,34 @@ class _MedicineReminderCardState extends State<MedicineReminderCard> {
     );
 
     try {
-      final token = await StorageService().getAccessToken();
-      if (token == null) throw Exception('Non authentifié');
-
-      await treatmentProvider.confirmerPrise(widget.prise);
+      final success = await treatmentProvider.confirmerPrise(widget.prise);
 
       if (mounted) {
         Navigator.pop(context); // Fermer le loading
+
+        if (!success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                treatmentProvider.error ?? 'Impossible de confirmer la prise.',
+              ),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+          return;
+        }
 
         setState(() {
           _isConfirmed = true;
         });
 
-        // Message de succès
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Medicine confirmed! Keep it up! 🎉'),
+            content: Text('Medicine confirmed! Keep it up!'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
-
-        // Fermer après 1 seconde
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) Navigator.pop(context);
-        });
       }
     } catch (e) {
       if (mounted) {
@@ -425,3 +427,5 @@ class MedicineRemindersListView extends StatelessWidget {
     );
   }
 }
+
+

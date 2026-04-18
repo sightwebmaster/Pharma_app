@@ -11,6 +11,7 @@ import 'package:pharma_app/presentation/widgets/common/icon_circle.dart';
 import 'package:pharma_app/presentation/widgets/dialogs/time_alarm_picker_dialog.dart';
 import 'package:pharma_app/presentation/widgets/medical/profile_pill.dart';
 import 'package:pharma_app/presentation/widgets/medical/segmented_meal_selector.dart';
+import 'package:pharma_app/presentation/screens/pharmacien/pharmacien_dashboard.dart';
 import 'package:pharma_app/services/storage_service.dart';
 import 'package:pharma_app/services/treatment_provider.dart';
 
@@ -49,7 +50,6 @@ class AddMedicineScreen extends StatefulWidget {
 class _AddMedicineScreenState extends State<AddMedicineScreen> {
   late final TextEditingController _medicineNameController;
   late final TextEditingController _typeController;
-  late final TextEditingController _timesPerDayController;
   late final TextEditingController _doseController;
   late final TextEditingController _durationController;
   late final TextEditingController _startDateController;
@@ -61,10 +61,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   late DateTime _startDate;
   late DateTime _endDate;
   List<String> _scheduledTimes = const ['08:00'];
+  late List<String> _availableDosages;
 
   final List<String> _medicineTypes = const [
     'Capsule',
-    'Comprimé',
+    'Comprime',
     'Sirop',
     'Injection',
     'Poudre',
@@ -76,13 +77,17 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     final initialDuration = widget.initialDurationDays ?? 7;
     _startDate = DateTime.now();
     _endDate = _startDate.add(Duration(days: initialDuration - 1));
+    _availableDosages = _extractDosageOptions(widget.initialDosage);
 
     _medicineNameController = TextEditingController(
       text: widget.initialMedicationName ?? '',
     );
     _typeController = TextEditingController(text: widget.initialType ?? '');
-    _timesPerDayController = TextEditingController(text: '1');
-    _doseController = TextEditingController(text: widget.initialDosage ?? '');
+    _doseController = TextEditingController(
+      text: _availableDosages.isNotEmpty
+          ? _availableDosages.first
+          : (widget.initialDosage ?? ''),
+    );
     _durationController = TextEditingController(text: initialDuration.toString());
     _startDateController = TextEditingController(
       text: DateFormat('yyyy-MM-dd').format(_startDate),
@@ -90,7 +95,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     _endDateController = TextEditingController(
       text: DateFormat('yyyy-MM-dd').format(_endDate),
     );
-    _motifController = TextEditingController(text: 'Prescription médicale');
+    _motifController = TextEditingController(
+      text: widget.recommendationNote?.trim().isNotEmpty == true
+          ? widget.recommendationNote!.trim()
+          : 'Prescription medicale',
+    );
 
     _rebuildScheduledTimes();
   }
@@ -99,13 +108,33 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   void dispose() {
     _medicineNameController.dispose();
     _typeController.dispose();
-    _timesPerDayController.dispose();
     _doseController.dispose();
     _durationController.dispose();
     _startDateController.dispose();
     _endDateController.dispose();
     _motifController.dispose();
     super.dispose();
+  }
+
+  List<String> _extractDosageOptions(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return const [];
+    }
+
+    final normalized = raw
+        .replaceAll(' ou ', '|')
+        .replaceAll(' OR ', '|')
+        .replaceAll(' / ', '|')
+        .replaceAll('/', '|')
+        .replaceAll(';', '|')
+        .replaceAll(',', '|');
+
+    return normalized
+        .split('|')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList();
   }
 
   void _showMedicineTypeBottomSheet() {
@@ -121,7 +150,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('Type du médicament', style: AppTextStyles.cardTitle),
+              child: Text('Type du medicament', style: AppTextStyles.cardTitle),
             ),
             Flexible(
               child: ListView.separated(
@@ -134,6 +163,53 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     onTap: () {
                       setState(() {
                         _typeController.text = _medicineTypes[index];
+                      });
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDosageBottomSheet() {
+    if (_availableDosages.length <= 1) {
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        color: AppColors.surface,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('Choisir le dosage', style: AppTextStyles.cardTitle),
+            ),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _availableDosages.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final dosage = _availableDosages[index];
+                  return ListTile(
+                    title: Text(dosage, style: AppTextStyles.fieldValue),
+                    trailing: dosage == _doseController.text
+                        ? const Icon(Icons.check_circle, color: AppColors.primary)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _doseController.text = dosage;
                       });
                       Navigator.pop(context);
                     },
@@ -195,7 +271,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   void _incrementTimes() {
     setState(() {
       _timesPerDay++;
-      _timesPerDayController.text = _timesPerDay.toString();
       _rebuildScheduledTimes();
     });
   }
@@ -206,7 +281,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     }
     setState(() {
       _timesPerDay--;
-      _timesPerDayController.text = _timesPerDay.toString();
       _rebuildScheduledTimes();
     });
   }
@@ -254,7 +328,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     if (token == null || pharmacienId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Session expirée — reconnectez-vous'),
+          content: Text('Session expiree - reconnectez-vous'),
           backgroundColor: Colors.red,
         ),
       );
@@ -268,7 +342,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       'dateDebut': DateFormat('yyyy-MM-dd').format(_startDate),
       'dateFin': DateFormat('yyyy-MM-dd').format(_endDate),
       'motif': _motifController.text.trim().isEmpty
-          ? 'Prescription médicale'
+          ? 'Prescription medicale'
           : _motifController.text.trim(),
       'lignes': [
         {
@@ -278,9 +352,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           'type': _typeController.text.trim(),
           'dureeJours': _endDate.difference(_startDate).inDays + 1,
           'heuresPrise': _scheduledTimes,
-          'instructions': widget.recommendationNote?.trim().isNotEmpty == true
-              ? '${_mealInstruction(_selectedMealType)}. ${widget.recommendationNote!.trim()}'
-              : _mealInstruction(_selectedMealType),
+          'instructions': _mealInstruction(_selectedMealType),
         },
       ],
     };
@@ -295,10 +367,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     if (result != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Traitement planifié avec succès'),
+          content: Text('Traitement planifie avec succes'),
           backgroundColor: Colors.green,
         ),
       );
+      await _showReceiptSheet();
       return;
     }
 
@@ -306,6 +379,98 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       SnackBar(
         content: Text(provider.error ?? 'Erreur lors de la planification du traitement'),
         backgroundColor: AppColors.danger,
+      ),
+    );
+  }
+
+  Future<void> _showReceiptSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Recu de planification',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Le traitement est enregistre et sera visible dans le suivi patient.',
+                style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 18),
+              _buildReceiptRow('Patient', widget.patientName),
+              _buildReceiptRow('Medicament', _medicineNameController.text.trim()),
+              _buildReceiptRow('Dosage', _doseController.text.trim()),
+              _buildReceiptRow('Date debut', _startDateController.text),
+              _buildReceiptRow('Date fin', _endDateController.text),
+              _buildReceiptRow('Prises / jour', _timesPerDay.toString()),
+              _buildReceiptRow('Heures', _scheduledTimes.join(' - ')),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: PrimaryButton(
+                  label: 'Fermer',
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => const PharmacienDashboard(),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReceiptRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value.isEmpty ? 'N/A' : value,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -332,7 +497,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   String _mealInstruction(String mealType) {
     switch (mealType) {
       case 'After Meals':
-        return 'Prendre après les repas';
+        return 'Prendre apres les repas';
       case 'With Meals':
         return 'Prendre pendant les repas';
       default:
@@ -393,7 +558,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Profil patient'.toUpperCase(), style: AppTextStyles.sectionLabel),
+              Text('PROFIL PATIENT', style: AppTextStyles.sectionLabel),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -409,7 +574,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     child: ProfilePill(
                       icon: Icons.cake,
                       label: '${widget.patientAge} ans',
-                      value: 'Âge',
+                      value: 'Age',
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -438,17 +603,17 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              Text('Détails du traitement'.toUpperCase(), style: AppTextStyles.sectionLabel),
+              Text('DETAILS DU TRAITEMENT', style: AppTextStyles.sectionLabel),
               const SizedBox(height: 12),
               AppTextField(
-                label: 'Nom du médicament',
+                label: 'Nom du medicament',
                 hintText: 'Ex: Amoxicilline',
                 controller: _medicineNameController,
                 trailingIcon: Icons.local_pharmacy_outlined,
               ),
               AppTextField(
                 label: 'Type',
-                hintText: 'Sélectionner le type',
+                hintText: 'Selectionner le type',
                 controller: _typeController,
                 trailingIcon: Icons.arrow_drop_down,
                 readOnly: true,
@@ -456,14 +621,25 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 onTap: _showMedicineTypeBottomSheet,
               ),
               AppTextField(
-                label: 'Dosage',
-                hintText: '500mg',
+                label: 'Dosage final',
+                hintText: _availableDosages.length > 1 ? 'Choisir le dosage' : '500mg',
                 controller: _doseController,
                 trailingIcon: Icons.straighten,
+                readOnly: _availableDosages.length > 1,
+                onTap: _availableDosages.length > 1 ? _showDosageBottomSheet : null,
+                onTraillingIconTap: _availableDosages.length > 1 ? _showDosageBottomSheet : null,
               ),
+              if (_availableDosages.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    'Plusieurs dosages sont proposes. Selectionnez le dosage retenu.',
+                    style: AppTextStyles.fieldLabel,
+                  ),
+                ),
               AppTextField(
                 label: 'Motif',
-                hintText: 'Prescription médicale',
+                hintText: 'Prescription medicale',
                 controller: _motifController,
                 trailingIcon: Icons.description_outlined,
               ),
@@ -517,7 +693,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 children: [
                   Expanded(
                     child: AppTextField(
-                      label: 'Date de début',
+                      label: 'Date de debut',
                       hintText: 'YYYY-MM-DD',
                       controller: _startDateController,
                       trailingIcon: Icons.calendar_today,
@@ -539,7 +715,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 ],
               ),
               AppTextField(
-                label: 'Durée totale',
+                label: 'Duree totale',
                 hintText: '7',
                 controller: _durationController,
                 trailingIcon: Icons.timelapse_outlined,

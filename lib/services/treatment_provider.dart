@@ -75,14 +75,20 @@ class TreatmentProvider extends ChangeNotifier {
       final token = await _storageService.getAccessToken() ?? '';
       final response = await _treatmentService.confirmerPrise(prise, token);
 
-      if (response.success) {
+      if (response.success && response.data != null) {
+        final confirmed = response.data!;
         final idx = _todayPrises.indexWhere((p) => p.id == prise.id);
         if (idx != -1) {
-          _todayPrises[idx] = _todayPrises[idx].copyWith(statut: 'CONFIRMEE');
+          _todayPrises[idx] = confirmed;
         }
         final allIdx = _allPrises.indexWhere((p) => p.id == prise.id);
         if (allIdx != -1) {
-          _allPrises[allIdx] = _allPrises[allIdx].copyWith(statut: 'CONFIRMEE');
+          _allPrises[allIdx] = confirmed;
+        }
+        if (prise.patientUserId.isNotEmpty) {
+          unawaited(loadTodayPrises(prise.patientUserId));
+          unawaited(loadAllPrises(prise.patientUserId));
+          unawaited(loadAdherenceSummary(prise.patientUserId));
         }
         notifyListeners();
         return true;
@@ -147,12 +153,11 @@ class TreatmentProvider extends ChangeNotifier {
 
       if (response.success && response.data != null) {
         _adherenceSummary = response.data;
-        _error = null;
       } else {
-        _error = response.message;
+        _adherenceSummary ??= AdherenceSummary.empty(patientId);
       }
     } catch (e) {
-      _error = 'Erreur: $e';
+      _adherenceSummary ??= AdherenceSummary.empty(patientId);
     }
     notifyListeners();
   }

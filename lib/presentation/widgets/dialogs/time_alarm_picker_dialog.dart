@@ -5,7 +5,7 @@ import 'package:pharma_app/presentation/widgets/common/app_buttons.dart';
 
 /// TimeAlarmPickerDialog - Dialog pour sélectionner l'heure d'alarme
 class TimeAlarmPickerDialog extends StatefulWidget {
-  final Function(String) onSave; // Retourne "HH:mm AM/PM"
+  final ValueChanged<String> onSave; // Retourne "HH:mm AM/PM"
   final String? initialTime;
 
   const TimeAlarmPickerDialog({
@@ -190,8 +190,8 @@ class _TimeAlarmPickerDialogState extends State<TimeAlarmPickerDialog> {
                       final minute = _formatNumber(_selectedMinute);
                       final period = _periods[_selectedPeriodIndex];
                       final selectedTime = '$hour:$minute $period';
-                      Navigator.pop(context);
                       widget.onSave(selectedTime);
+                      Navigator.pop(context);
                     },
                   ),
                 ),
@@ -259,13 +259,14 @@ Future<String?> showTimePickerDialog(
   BuildContext context, {
   String? initialTime,
 }) {
+  String? selectedTime;
   return showDialog<String>(
     context: context,
     builder: (context) => TimeAlarmPickerDialog(
       initialTime: initialTime,
       onSave: (time) {
-        Navigator.pop(context, time);
+        selectedTime = time;
       },
     ),
-  );
+  ).then((_) => selectedTime);
 }

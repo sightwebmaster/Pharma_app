@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'core/routes/app_routes.dart';
 import 'core/themes/app_theme.dart';
 import 'services/api_client.dart';
+import 'services/local_notification_service.dart';
 import 'services/storage_service.dart';
 import 'presentation/viewmodels/auth_viewmodel.dart';
 
@@ -22,6 +23,7 @@ void main() async {
 
   if (!kIsWeb) {
     await Firebase.initializeApp();
+    await LocalNotificationService().init();
   }
 
   // Initialiser les services

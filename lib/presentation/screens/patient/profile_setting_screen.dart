@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../data/models/notification_preferences.dart';
 import '../../../presentation/viewmodels/profile_viewmodel.dart';
 import '../../../presentation/viewmodels/auth_viewmodel.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../presentation/widgets/common/user_avatar.dart';
+import '../../../services/notification_preferences_service.dart';
 
 /// Écran de paramètres du compte utilisateur
 /// Point d'entrée principal du module "Compte"
@@ -18,6 +20,9 @@ class ProfileSettingScreen extends StatefulWidget {
 }
 
 class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
+  final NotificationPreferencesService _notificationPreferencesService =
+      NotificationPreferencesService();
+
   @override
   void initState() {
     super.initState();
@@ -144,12 +149,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                 icon: Icons.notifications_active,
                 title: 'Notifications médicales',
                 subtitle: 'Rappels de prise, alertes proches et informations de suivi',
-                onTap: () => _showInfoSheet(
-                  context,
-                  title: 'Notifications médicales',
-                  description:
-                      'Les rappels de prise et les alertes d’adhérence sont pilotés automatiquement par PharmaCare. Assure-toi simplement d’autoriser les notifications sur ton téléphone.',
-                ),
+                onTap: () => _showNotificationPreferencesSheet(context),
               ),
               SizedBox(height: AppConstants.paddingStandard),
               _buildSettingCell(
@@ -199,6 +199,154 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _showNotificationPreferencesSheet(BuildContext context) async {
+    var preferences = await _notificationPreferencesService.load();
+    if (!context.mounted) return;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Rappels et sonnerie',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Configure les rappels de prise, la sonnerie et les alertes de suivi.',
+                    style: TextStyle(color: AppColors.grey, height: 1.4),
+                  ),
+                  const SizedBox(height: 18),
+                  SwitchListTile(
+                    value: preferences.remindersEnabled,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        preferences = preferences.copyWith(
+                          remindersEnabled: value,
+                        );
+                      });
+                    },
+                    title: const Text('Activer les rappels de prise'),
+                  ),
+                  SwitchListTile(
+                    value: preferences.soundEnabled,
+                    onChanged: preferences.remindersEnabled
+                        ? (value) {
+                            setSheetState(() {
+                              preferences = preferences.copyWith(
+                                soundEnabled: value,
+                              );
+                            });
+                          }
+                        : null,
+                    title: const Text('Jouer une sonnerie'),
+                  ),
+                  SwitchListTile(
+                    value: preferences.repeatEveryMinuteUntilConfirmed,
+                    onChanged: preferences.remindersEnabled
+                        ? (value) {
+                            setSheetState(() {
+                              preferences = preferences.copyWith(
+                                repeatEveryMinuteUntilConfirmed: value,
+                              );
+                            });
+                          }
+                        : null,
+                    title: const Text(
+                      'Répéter chaque minute jusqu\'à confirmation',
+                    ),
+                  ),
+                  SwitchListTile(
+                    value: preferences.alertCaregiverAfterThirtyMinutes,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        preferences = preferences.copyWith(
+                          alertCaregiverAfterThirtyMinutes: value,
+                        );
+                      });
+                    },
+                    title: const Text('Alerter le proche après 30 minutes'),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: preferences.ringtoneName,
+                    decoration: const InputDecoration(
+                      labelText: 'Sonnerie',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'default',
+                        child: Text('Par défaut'),
+                      ),
+                      DropdownMenuItem(value: 'soft', child: Text('Douce')),
+                      DropdownMenuItem(
+                        value: 'urgent',
+                        child: Text('Urgente'),
+                      ),
+                    ],
+                    onChanged: preferences.soundEnabled
+                        ? (value) {
+                            if (value == null) return;
+                            setSheetState(() {
+                              preferences = preferences.copyWith(
+                                ringtoneName: value,
+                              );
+                            });
+                          }
+                        : null,
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await _notificationPreferencesService.save(preferences);
+                        if (!context.mounted) return;
+                        Navigator.of(sheetContext).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Préférences de notification enregistrées',
+                            ),
+                            backgroundColor: AppColors.primaryGreen,
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                      ),
+                      child: const Text(
+                        'Enregistrer',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -487,3 +635,4 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
     );
   }
 }
+
