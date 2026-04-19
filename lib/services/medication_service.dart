@@ -54,6 +54,7 @@ class MedicationService {
   // ═══════════════════════════════════════════════════════════════
 
   Future<ApiResponse<void>> confirmerPrise(String priseId) async {
+<<<<<<< HEAD
     try {
       // ✅ Pas de body requis — le Gateway propage X-User-Id pour vérifier
       await _dio.post(ApiConfig.confirmerPrise(priseId));
@@ -75,6 +76,13 @@ class MedicationService {
     } catch (e) {
       return ApiResponse.error(message: 'Erreur: ${e.toString()}', error: e);
     }
+=======
+    return ApiResponse.error(
+      message:
+          'Confirmation indisponible sur ce flux legacy. Utilisez TreatmentProvider avec traitementId.',
+      statusCode: 501,
+    );
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -208,4 +216,8 @@ class MedicationService {
       statusCode: 501,
     );
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234

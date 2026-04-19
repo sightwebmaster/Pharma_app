@@ -55,6 +55,12 @@
     statut: json['statut'] as String? ?? 'PLANIFIEE',
   );
 
+<<<<<<< HEAD
+=======
+  DateTime? get heurePrevueDateTime =>
+      heurePrevue == null ? null : DateTime.tryParse(heurePrevue!);
+
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
   bool get isConfirmed => statut == 'CONFIRMEE';
   bool get isMissed => statut == 'MANQUEE';
   bool get isScheduled => statut == 'PLANIFIEE';

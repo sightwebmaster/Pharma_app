@@ -3,6 +3,10 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+<<<<<<< HEAD
+=======
+  file_selector_linux
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
   flutter_secure_storage_linux
 )
 

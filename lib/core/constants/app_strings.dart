@@ -1,5 +1,5 @@
 class AppStrings {
-  static const String appName = 'Projet Pharma';
+  static const String appName = 'PharmaCare';
   static const String login = 'Connexion';
   static const String signup = 'Inscription';
   static const String email = 'Email';

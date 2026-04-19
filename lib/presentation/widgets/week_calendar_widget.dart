@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
 import '../../core/constants/app_colors.dart';
+=======
+import 'package:provider/provider.dart';
+import '../../core/constants/app_colors.dart';
+import '../../services/treatment_provider.dart';
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 
 class WeekCalendarWidget extends StatefulWidget {
   final Function(DateTime) onDaySelected;
@@ -47,6 +53,11 @@ class _WeekCalendarWidgetState extends State<WeekCalendarWidget> {
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
+=======
+    final prises = context.watch<TreatmentProvider>().allPrises;
+
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -54,6 +65,16 @@ class _WeekCalendarWidgetState extends State<WeekCalendarWidget> {
           final date = _weekDays[index];
           final isToday = _isToday(date);
           final isSelected = _isSelected(date);
+<<<<<<< HEAD
+=======
+          final hasPrises = prises.any((prise) {
+            final dt = prise.heurePrevueDateTime;
+            return dt != null &&
+                dt.year == date.year &&
+                dt.month == date.month &&
+                dt.day == date.day;
+          });
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -104,9 +125,15 @@ class _WeekCalendarWidgetState extends State<WeekCalendarWidget> {
                       height: 4,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
+<<<<<<< HEAD
                         color: isSelected
                             ? AppColors.white
                             : AppColors.primaryGreen,
+=======
+                        color: hasPrises
+                            ? (isSelected ? AppColors.white : AppColors.primaryGreen)
+                            : Colors.transparent,
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
                       ),
                     ),
                   ],

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
+=======
+import 'package:intl/intl.dart';
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
@@ -94,6 +98,12 @@ class _SignupScreenState extends State<SignupScreen> {
       telephone: _telephoneController.text.trim(),
       adresse: _adresseController.text.trim(),
       role: AppStrings.patient,
+<<<<<<< HEAD
+=======
+      dateNaissance: _dateNaissanceController.text.trim().isEmpty
+          ? null
+          : DateFormat('d/M/yyyy').parse(_dateNaissanceController.text.trim()),
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
       groupeSanguin: _selectedGroupeSanguin,
       allergies: _selectedAllergies,
       maladiesChroniques: _selectedMaladiesChroniques,

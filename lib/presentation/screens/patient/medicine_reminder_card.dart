@@ -7,7 +7,10 @@ import 'package:pharma_app/presentation/widgets/common/app_card.dart';
 import 'package:pharma_app/presentation/widgets/common/icon_circle.dart';
 import 'package:pharma_app/presentation/widgets/illustrations/medicine_illustration.dart';
 import 'package:pharma_app/services/treatment_provider.dart';
+<<<<<<< HEAD
 import 'package:pharma_app/services/storage_service.dart';
+=======
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 import 'package:pharma_app/data/models/prise_planifiee.dart';
 
 /// MedicineReminderCard - Card "Did you take your Medicine?"
@@ -49,31 +52,59 @@ class _MedicineReminderCardState extends State<MedicineReminderCard> {
     );
 
     try {
+<<<<<<< HEAD
       final token = await StorageService().getAccessToken();
       if (token == null) throw Exception('Non authentifié');
 
       await treatmentProvider.confirmerPrise(widget.prise.id);
+=======
+      final success = await treatmentProvider.confirmerPrise(widget.prise);
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 
       if (mounted) {
         Navigator.pop(context); // Fermer le loading
 
+<<<<<<< HEAD
+=======
+        if (!success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                treatmentProvider.error ?? 'Impossible de confirmer la prise.',
+              ),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+          return;
+        }
+
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
         setState(() {
           _isConfirmed = true;
         });
 
+<<<<<<< HEAD
         // Message de succès
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Medicine confirmed! Keep it up! 🎉'),
+=======
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Medicine confirmed! Keep it up!'),
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
+<<<<<<< HEAD
 
         // Fermer après 1 seconde
         Future.delayed(const Duration(seconds: 1), () {
           if (mounted) Navigator.pop(context);
         });
+=======
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
       }
     } catch (e) {
       if (mounted) {
@@ -425,3 +456,8 @@ class MedicineRemindersListView extends StatelessWidget {
     );
   }
 }
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234

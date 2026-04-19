@@ -13,7 +13,11 @@ import 'storage_service.dart';
 ///   GET    /api/v1/patients/{userId}/proches/{procheId}/profil
 ///   DELETE /api/v1/patients/{userId}/proches/{procheId}
 class ProcheService {
+<<<<<<< HEAD
   final Dio _dio = ApiClient().dio; // Gateway — JWT requis
+=======
+  final Dio _dio = ApiClient().userDio; // user-service direct — JWT requis
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
   final StorageService _storage = StorageService();
 
   // ═══════════════════════════════════════════════════════════════
@@ -116,7 +120,11 @@ class ProcheService {
       final response = await _dio.post(
         '/api/v1/patients/$userId/proches/by-qrcode',
         data: {
+<<<<<<< HEAD
           'qrCodeContent': qrCodeContent,
+=======
+          'procheUserId': qrCodeContent,
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
           'relation': relation,
         },
       );
@@ -208,4 +216,8 @@ class ProcheService {
       return ApiResponse.error(message: 'Erreur: ${e.toString()}', error: e);
     }
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234

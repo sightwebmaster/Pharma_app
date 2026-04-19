@@ -61,6 +61,10 @@ class AuthService {
     required String email,
     required String password,
     String? telephone,
+<<<<<<< HEAD
+=======
+    DateTime? dateNaissance,
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
     String? groupeSanguin,
     List<String>? allergies,
     List<String>? maladiesChroniques,
@@ -75,6 +79,12 @@ class AuthService {
       };
 
       if (telephone != null) data['telephone'] = telephone;
+<<<<<<< HEAD
+=======
+      if (dateNaissance != null) {
+        data['dateNaissance'] = dateNaissance.toIso8601String().split('T').first;
+      }
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
       if (groupeSanguin != null) data['groupeSanguin'] = groupeSanguin;
       if (allergies != null && allergies.isNotEmpty) {
         data['allergies'] = allergies;
@@ -122,6 +132,49 @@ class AuthService {
     return ApiResponse.success(data: null, message: 'Déconnexion réussie');
   }
 
+<<<<<<< HEAD
+=======
+  Future<ApiResponse<void>> changePassword({
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post(
+        ApiConfig.changePasswordEndpoint,
+        data: {
+          'email': email,
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        },
+        options: Options(
+          headers: {
+            'X-User-Id': _storage.getUserId(),
+          },
+        ),
+      );
+
+      return ApiResponse.success(
+        data: null,
+        message: 'Mot de passe modifié',
+      );
+    } on DioException catch (e) {
+      return ApiResponse.error(
+        message: e.response?.data is Map<String, dynamic>
+            ? (e.response!.data['message']?.toString() ?? e.message ?? 'Erreur changement mot de passe')
+            : (e.message ?? 'Erreur changement mot de passe'),
+        statusCode: e.response?.statusCode,
+        error: e,
+      );
+    } catch (e) {
+      return ApiResponse.error(
+        message: 'Erreur inconnue: ${e.toString()}',
+        error: e,
+      );
+    }
+  }
+
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
   // ═══════════════════════════════════════════════════════════════
   // REFRESH TOKEN — re-login silencieux
   // ═══════════════════════════════════════════════════════════════
@@ -172,4 +225,8 @@ class AuthService {
     await _storage.saveUserName(authResponse.user.fullName);
     await _storage.saveIsLoggedIn(true);
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234

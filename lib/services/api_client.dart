@@ -15,17 +15,45 @@ class ApiClient {
   factory ApiClient() => _instance;
   ApiClient._internal();
 
+<<<<<<< HEAD
   late Dio _dio;
   late Dio _authDio;
+=======
+  Dio? _dio;
+  Dio? _authDio;
+  Dio? _userDio;
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 
   final StorageService _storage = StorageService();
 
   /// Dio principal — Gateway port 8085 — JWT requis
+<<<<<<< HEAD
   Dio get dio => _dio;
 
   /// Dio auth — user-service port 8083 — PAS de JWT
   /// Utiliser pour : loginEndpoint, registerEndpoint
   Dio get authDio => _authDio;
+=======
+  Dio get dio {
+    _ensureInitialized();
+    return _dio!;
+  }
+
+  /// Dio auth — user-service port 8083 — PAS de JWT
+  /// Utiliser pour : loginEndpoint, registerEndpoint
+  Dio get authDio {
+    _ensureInitialized();
+    return _authDio!;
+  }
+
+  /// Dio user-service direct (port 8083) — JWT requis
+  /// Utiliser pour les endpoints user-service protégés:
+  /// profil, QR code, proches, etc.
+  Dio get userDio {
+    _ensureInitialized();
+    return _userDio!;
+  }
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 
   void init() {
     // ── Dio principal (Gateway) ──────────────────────────────────
@@ -37,9 +65,15 @@ class ApiClient {
         headers: ApiConfig.defaultHeaders,
       ),
     );
+<<<<<<< HEAD
     _dio.interceptors.add(_authInterceptor());
     _dio.interceptors.add(_loggingInterceptor());
     _dio.interceptors.add(_errorInterceptor());
+=======
+    _dio!.interceptors.add(_authInterceptor());
+    _dio!.interceptors.add(_loggingInterceptor());
+    _dio!.interceptors.add(_errorInterceptor());
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 
     // ── Dio auth (user-service direct) ──────────────────────────
     // PAS d'intercepteur JWT — login/register n'ont pas de token
@@ -51,8 +85,28 @@ class ApiClient {
         headers: ApiConfig.defaultHeaders,
       ),
     );
+<<<<<<< HEAD
     _authDio.interceptors.add(_loggingInterceptor());
     _authDio.interceptors.add(_errorInterceptor());
+=======
+    _authDio!.interceptors.add(_loggingInterceptor());
+    _authDio!.interceptors.add(_errorInterceptor());
+
+    // ── Dio user-service direct sécurisé ────────────────────────
+    _userDio = Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.authBaseUrl,
+        // Les écrans profil / proches / QR sont souvent appelés juste après login
+        // sur mobile, donc on laisse un peu plus de marge réseau.
+        connectTimeout: const Duration(seconds: 25),
+        receiveTimeout: const Duration(seconds: 25),
+        headers: ApiConfig.defaultHeaders,
+      ),
+    );
+    _userDio!.interceptors.add(_authInterceptor());
+    _userDio!.interceptors.add(_loggingInterceptor());
+    _userDio!.interceptors.add(_errorInterceptor());
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -88,7 +142,11 @@ class ApiClient {
                 // Rejouer la requête originale avec le nouveau token
                 final opts = error.requestOptions;
                 opts.headers['Authorization'] = 'Bearer $newToken';
+<<<<<<< HEAD
                 final response = await _dio.fetch(opts);
+=======
+                final response = await dio.fetch(opts);
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
                 return handler.resolve(response);
               }
             }
@@ -192,4 +250,13 @@ class ApiClient {
       },
     );
   }
+<<<<<<< HEAD
+=======
+
+  void _ensureInitialized() {
+    if (_dio == null || _authDio == null || _userDio == null) {
+      init();
+    }
+  }
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 }

@@ -82,7 +82,11 @@ class _ShareProfileQRScreenState extends State<ShareProfileQRScreen> {
         builder: (context, profileVM, _) {
 
           // ── Loading ──────────────────────────────────────────
+<<<<<<< HEAD
           if (profileVM.isLoading) {
+=======
+          if (profileVM.isQrLoading && profileVM.qrCode == null) {
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
             return const Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(
@@ -93,7 +97,11 @@ class _ShareProfileQRScreenState extends State<ShareProfileQRScreen> {
           }
 
           // ── Erreur ───────────────────────────────────────────
+<<<<<<< HEAD
           if (profileVM.isError) {
+=======
+          if (profileVM.qrErrorMessage != null && profileVM.qrCode == null) {
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -101,7 +109,11 @@ class _ShareProfileQRScreenState extends State<ShareProfileQRScreen> {
                   const Icon(Icons.error_outline, size: 48, color: Colors.red),
                   const SizedBox(height: 16),
                   Text(
+<<<<<<< HEAD
                     profileVM.errorMessage ?? 'Erreur chargement QR Code',
+=======
+                    profileVM.qrErrorMessage ?? 'Erreur chargement QR Code',
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 16),
                   ),
@@ -119,13 +131,28 @@ class _ShareProfileQRScreenState extends State<ShareProfileQRScreen> {
           final qrCode = profileVM.qrCode;
 
           // ── Pas encore chargé ────────────────────────────────
+<<<<<<< HEAD
           if (user == null || qrCode == null) {
+=======
+          if (qrCode == null) {
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
             return const Center(
               child: Text('Chargement du QR Code...'),
             );
           }
 
           final qrData = _extractQrData(qrCode);
+<<<<<<< HEAD
+=======
+          final displayName = user?.fullName.isNotEmpty == true
+              ? user!.fullName
+              : 'Profil patient';
+          final initials = user == null
+              ? 'PC'
+              : '${user.prenom.isNotEmpty ? user.prenom[0] : ''}'
+                    '${user.nom.isNotEmpty ? user.nom[0] : ''}'
+                    .toUpperCase();
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
 
           return SingleChildScrollView(
             child: Padding(
@@ -166,9 +193,13 @@ class _ShareProfileQRScreenState extends State<ShareProfileQRScreen> {
                           ),
                           child: Center(
                             child: Text(
+<<<<<<< HEAD
                               '${user.prenom.isNotEmpty ? user.prenom[0] : ''}'
                               '${user.nom.isNotEmpty ? user.nom[0] : ''}'
                                   .toUpperCase(),
+=======
+                              initials,
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
                               style: const TextStyle(
                                 fontSize: 40,
                                 fontWeight: FontWeight.bold,
@@ -181,7 +212,11 @@ class _ShareProfileQRScreenState extends State<ShareProfileQRScreen> {
                         SizedBox(height: AppConstants.paddingLarge),
 
                         Text(
+<<<<<<< HEAD
                           user.fullName,
+=======
+                          displayName,
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
                           style: const TextStyle(
                             color: AppColors.white,
                             fontSize: 20,
@@ -307,4 +342,8 @@ class _ShareProfileQRScreenState extends State<ShareProfileQRScreen> {
       ),
     );
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234

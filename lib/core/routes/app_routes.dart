@@ -97,6 +97,14 @@ class AppRoutes {
     required String patientSex,
     required String allergies,
     required bool isPregnant,
+<<<<<<< HEAD
+=======
+    String? initialMedicationName,
+    String? initialDosage,
+    String? initialType,
+    int? initialDurationDays,
+    String? recommendationNote,
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
   }) {
     Navigator.push(
       context,
@@ -108,6 +116,14 @@ class AppRoutes {
           patientSex: patientSex,
           allergies: allergies,
           isPregnant: isPregnant,
+<<<<<<< HEAD
+=======
+          initialMedicationName: initialMedicationName,
+          initialDosage: initialDosage,
+          initialType: initialType,
+          initialDurationDays: initialDurationDays,
+          recommendationNote: recommendationNote,
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
         ),
       ),
     );

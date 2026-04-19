@@ -38,7 +38,11 @@ class _PatientQRCodeWidgetState extends State<PatientQRCodeWidget> {
 
     if (response.success && response.data != null) {
       setState(() {
+<<<<<<< HEAD
         _qrData = response.data!.id;
+=======
+        _qrData = response.data!;
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
         _isLoading = false;
       });
     } else {

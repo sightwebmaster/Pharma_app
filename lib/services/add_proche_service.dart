@@ -5,7 +5,11 @@ import 'api_client.dart';
 import 'storage_service.dart';
 
 class AddProcheService {
+<<<<<<< HEAD
   final Dio _dio = ApiClient().dio;
+=======
+  final Dio _dio = ApiClient().userDio;
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
   final StorageService _storage = StorageService();
 
   /// Ajouter un proche par email (le proche doit être un patient existant)
@@ -22,7 +26,11 @@ class AddProcheService {
       }
 
       final response = await _dio.post(
+<<<<<<< HEAD
         '/patients/$userId/proches/by-email',
+=======
+        '/api/v1/patients/$userId/proches/by-email',
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
         data: {
           'email': email,
           'relation': relation,
@@ -70,7 +78,11 @@ class AddProcheService {
       }
 
       final response = await _dio.post(
+<<<<<<< HEAD
         '/patients/$userId/proches/by-qrcode',
+=======
+        '/api/v1/patients/$userId/proches/by-qrcode',
+>>>>>>> dc6ccb98422de4442b9a23b8821d05e677c94234
         data: {
           'procheUserId': procheUserId,
           'relation': relation,
