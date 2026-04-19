@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'core/routes/app_routes.dart';
 import 'core/themes/app_theme.dart';
 import 'services/api_client.dart';
+import 'services/local_notification_service.dart';
 import 'services/storage_service.dart';
 import 'presentation/viewmodels/auth_viewmodel.dart';
 
@@ -19,9 +20,16 @@ void main() async {
   // Assurer l'initialisation de Flutter
   WidgetsFlutterBinding.ensureInitialized();
 
+<<<<<<< HEAD
   // if (!kIsWeb) {
   //   await Firebase.initializeApp();
   // }
+=======
+  if (!kIsWeb) {
+    await Firebase.initializeApp();
+    await LocalNotificationService().init();
+  }
+>>>>>>> aa86dbabf5ff427bb1e238a1def1446a9a57bc24
 
   // Initialiser les services
   await StorageService().init();

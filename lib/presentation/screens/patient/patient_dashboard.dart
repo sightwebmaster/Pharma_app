@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -13,6 +16,8 @@ import 'package:pharma_app/presentation/widgets/add_proche_dialog_widget.dart';
 import 'package:pharma_app/presentation/widgets/common/user_avatar.dart';
 import 'package:pharma_app/presentation/widgets/pharma_bottom_nav.dart';
 import 'package:pharma_app/presentation/widgets/week_calendar_widget.dart';
+import 'package:pharma_app/services/local_notification_service.dart';
+import 'package:pharma_app/services/notification_preferences_service.dart';
 import 'package:pharma_app/services/treatment_provider.dart';
 
 class PatientDashboard extends StatefulWidget {
@@ -24,23 +29,26 @@ class PatientDashboard extends StatefulWidget {
 
 class _PatientDashboardState extends State<PatientDashboard> {
   int _selectedIndex = 0;
+  Timer? _refreshTimer;
+  String? _lastReminderPriseId;
+  DateTime? _lastReminderShownAt;
+  final NotificationPreferencesService _notificationPreferencesService =
+      NotificationPreferencesService();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authVm = context.read<AuthViewModel>();
-      final patientId = authVm.currentUser?.id;
-
       context.read<ProcheViewModel>().loadProches();
-
-      if (patientId != null && patientId.isNotEmpty) {
-        final treatmentProvider = context.read<TreatmentProvider>();
-        treatmentProvider.loadTodayPrises(patientId);
-        treatmentProvider.loadAllPrises(patientId);
-        treatmentProvider.loadAdherenceSummary(patientId);
-      }
+      unawaited(_refreshAll());
+      _startAutoRefresh();
     });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -186,6 +194,10 @@ class _PatientDashboardState extends State<PatientDashboard> {
     final treatmentProvider = context.watch<TreatmentProvider>();
     final prochesVm = context.watch<ProcheViewModel>();
     final user = authVm.currentUser;
+<<<<<<< HEAD
+=======
+    final nextPrise = _findPriorityPrise(treatmentProvider.todayPrises);
+>>>>>>> aa86dbabf5ff427bb1e238a1def1446a9a57bc24
 
     return RefreshIndicator(
       color: AppColors.primaryGreen,
@@ -334,8 +346,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     icon: Icons.medication_outlined,
                   )
                 else
-                  ...treatmentProvider.todayPrises
-                      .map((prise) => _buildPriseCard(prise)),
+                  _buildTodayPrisesSections(
+                    treatmentProvider.todayPrises,
+                    emptyTitle: 'Aucune prise planifiee',
+                    emptySubtitle: 'Vos traitements du jour apparaitront ici.',
+                  ),
               ],
             ),
           ),
@@ -376,7 +391,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
             icon: Icons.calendar_month_outlined,
           )
         else
-          ...treatmentProvider.todayPrises.map((prise) => _buildPriseCard(prise)),
+          _buildTodayPrisesSections(
+            treatmentProvider.todayPrises,
+            emptyTitle: 'Aucun traitement actif',
+            emptySubtitle:
+                'Les traitements planifies par votre pharmacien seront listes ici.',
+          ),
       ],
     );
   }
@@ -384,10 +404,10 @@ class _PatientDashboardState extends State<PatientDashboard> {
   Widget _buildHistoriqueTab() {
     final treatmentProvider = context.watch<TreatmentProvider>();
     final adherence = treatmentProvider.adherenceSummary;
-    final prises = treatmentProvider.todayPrises;
-    final confirmedCount = prises.where((prise) => prise.statut == 'CONFIRMEE').length;
+    final prises = _sortedPrises(treatmentProvider.allPrises);
+    final confirmedCount = prises.where(_isConfirmedPrise).length;
     final totalCount = prises.length;
-    final missedCount = totalCount - confirmedCount;
+    final missedCount = prises.where(_isMissedPrise).length;
     final todayPct = totalCount == 0 ? 0 : ((confirmedCount / totalCount) * 100).round();
 
     return ListView(
@@ -452,11 +472,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
             icon: Icons.history_toggle_off,
           )
         else
-          ...prises.map(
+          ...prises.take(20).map(
             (prise) => _buildHistoryRow(
               title: prise.medicamentNom ?? 'Médicament',
               subtitle: '${prise.heurePrevue ?? 'N/A'} · ${prise.dosage ?? 'N/A'}',
-              isSuccess: prise.statut == 'CONFIRMEE',
+              isSuccess: _isConfirmedPrise(prise),
             ),
           ),
       ],
@@ -468,8 +488,17 @@ class _PatientDashboardState extends State<PatientDashboard> {
     final proches = context.watch<ProcheViewModel>().proches;
     final pendingPrises = prises.where((prise) => prise.statut != 'CONFIRMEE').toList();
     final confirmedPrises = prises.where((prise) => prise.statut == 'CONFIRMEE').toList();
+    final overduePrises = pendingPrises.where(_isOverdueByThirtyMinutes).toList();
 
     final notifications = <Map<String, dynamic>>[
+      ...overduePrises.map(
+        (prise) => {
+          'title': 'Alerte prise en retard',
+          'subtitle': '${prise.medicamentNom ?? 'Medicament'} depasse 30 minutes sans confirmation',
+          'icon': Icons.warning_amber_rounded,
+          'color': AppColors.errorRed,
+        },
+      ),
       ...pendingPrises.map(
         (prise) => {
           'title': 'Prise en attente',
@@ -606,9 +635,18 @@ class _PatientDashboardState extends State<PatientDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Prochaine prise',
-            style: TextStyle(color: Colors.white70, fontSize: 13),
+          Text(
+            _isOverdue(nextPrise)
+                ? 'Prise en retard'
+                : _isDueSoon(nextPrise)
+                    ? 'A prendre maintenant'
+                    : 'Prochaine prise',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              fontWeight:
+                  _isOverdue(nextPrise) ? FontWeight.w700 : FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -624,16 +662,47 @@ class _PatientDashboardState extends State<PatientDashboard> {
             '${nextPrise.heurePrevue ?? 'N/A'} · ${nextPrise.dosage ?? 'N/A'}',
             style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
+          const SizedBox(height: 6),
+          Text(
+            _buildDoseStatusMessage(nextPrise),
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
           const SizedBox(height: 14),
           OutlinedButton(
             onPressed: () async {
               if (nextPrise.id == null) {
                 return;
               }
+              if (nextPrise.statut == 'CONFIRMEE' || nextPrise.statut == 'MANQUEE') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(_buildDoseStatusMessage(nextPrise)),
+                    backgroundColor: AppColors.errorRed,
+                  ),
+                );
+                return;
+              }
               final success = await context.read<TreatmentProvider>().confirmerPrise(nextPrise);
+              final provider = context.read<TreatmentProvider>();
               if (!mounted) {
                 return;
               }
+              if (!success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      provider.error ?? 'Impossible de confirmer la prise.',
+                    ),
+                    backgroundColor: AppColors.errorRed,
+                  ),
+                );
+                return;
+              }
+              unawaited(
+                LocalNotificationService().cancelDoseReminder(
+                  nextPrise.id.hashCode,
+                ),
+              );
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -648,11 +717,110 @@ class _PatientDashboardState extends State<PatientDashboard> {
               foregroundColor: Colors.white,
               side: const BorderSide(color: Colors.white70),
             ),
-            child: const Text('Confirmer maintenant'),
+            child: const Text('Confirmer'),
           ),
         ],
       ),
     );
+  }
+
+  String _buildDoseStatusMessage(dynamic prise) {
+    if (prise.statut == 'CONFIRMEE') {
+      return 'Cette prise a deja ete confirmee.';
+    }
+    if (prise.statut == 'MANQUEE') {
+      return 'Cette prise est deja marquee comme manquee et ne peut plus etre confirmee.';
+    }
+    if (_isOverdue(prise)) {
+      return 'Cette prise est en retard. Confirmez-la des que possible.';
+    }
+    return 'Confirmez la prise apres avoir pris le medicament.';
+  }
+
+  Widget _buildTodayPrisesSections(
+    List<dynamic> prises, {
+    required String emptyTitle,
+    required String emptySubtitle,
+  }) {
+    final sorted = _sortedPrises(prises);
+    final upcoming = sorted
+        .where((prise) => !_isConfirmedPrise(prise) && !_isMissedPrise(prise))
+        .toList();
+    final missed = sorted.where(_isMissedPrise).toList();
+    final confirmed = sorted.where(_isConfirmedPrise).toList();
+
+    if (sorted.isEmpty) {
+      return _buildEmptyState(
+        title: emptyTitle,
+        subtitle: emptySubtitle,
+        icon: Icons.medication_outlined,
+      );
+    }
+
+    return Column(
+      children: [
+        if (upcoming.isNotEmpty) ...[
+          _buildPriseSection(
+            _hasOverduePrise(upcoming) ? 'A prendre / en retard' : 'A prendre',
+            upcoming,
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (missed.isNotEmpty) ...[
+          _buildPriseSection('Prises manquees', missed),
+          const SizedBox(height: 12),
+        ],
+        if (confirmed.isNotEmpty) _buildPriseSection('Prises confirmees', confirmed),
+      ],
+    );
+  }
+
+  Widget _buildPriseSection(String title, List<dynamic> prises) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.black,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...prises.map((prise) => _buildPriseCard(prise)),
+      ],
+    );
+  }
+
+  List<dynamic> _sortedPrises(List<dynamic> prises) {
+    final copy = List<dynamic>.from(prises);
+    copy.sort((a, b) {
+      final aDate = a.heurePrevueDateTime ?? DateTime.now();
+      final bDate = b.heurePrevueDateTime ?? DateTime.now();
+      return aDate.compareTo(bDate);
+    });
+    return copy;
+  }
+
+  bool _isConfirmedPrise(dynamic prise) => prise.statut == 'CONFIRMEE';
+
+  bool _isMissedPrise(dynamic prise) => prise.statut == 'MANQUEE';
+
+  bool _hasOverduePrise(List<dynamic> prises) =>
+      prises.any((prise) => _isOverdue(prise));
+
+  String _statusLabel(dynamic prise) {
+    if (_isConfirmedPrise(prise)) {
+      return 'Confirmee';
+    }
+    if (_isMissedPrise(prise)) {
+      return 'Manquee';
+    }
+    if (_isOverdue(prise)) {
+      return 'En retard';
+    }
+    return 'Planifiee';
   }
 
   Widget _buildSummaryCards(TreatmentProvider treatmentProvider, int prochesCount) {
@@ -842,6 +1010,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   Widget _buildProcheCard(ProcheModel proche) {
+    final imageData = _extractBase64(proche.photoBase64);
     return InkWell(
       onTap: () => AppRoutes.navigateToProcheDetail(context, proche),
       borderRadius: BorderRadius.circular(16),
@@ -864,10 +1033,13 @@ class _PatientDashboardState extends State<PatientDashboard> {
             CircleAvatar(
               radius: 24,
               backgroundColor: AppColors.primaryGreen.withOpacity(0.12),
-              child: Text(
-                _avatarLabel(proche),
-                style: const TextStyle(fontSize: 18),
-              ),
+              backgroundImage: imageData == null ? null : MemoryImage(base64Decode(imageData)),
+              child: imageData == null
+                  ? Text(
+                      _avatarLabel(proche),
+                      style: const TextStyle(fontSize: 18),
+                    )
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -890,6 +1062,21 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     proche.relation ?? 'Proche',
                     style: const TextStyle(fontSize: 12, color: AppColors.grey),
                   ),
+                  if ((proche.status ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      proche.status!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: (proche.status ?? '').toLowerCase().contains('rappel')
+                            ? AppColors.errorRed
+                            : AppColors.primaryGreen,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -900,7 +1087,14 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   Widget _buildPriseCard(dynamic prise) {
-    final isConfirmed = prise.statut == 'CONFIRMEE';
+    final isConfirmed = _isConfirmedPrise(prise);
+    final isMissed = _isMissedPrise(prise);
+    final isOverdue = _isOverdue(prise);
+    final accentColor = isConfirmed
+        ? AppColors.primaryGreen
+        : isMissed || isOverdue
+            ? AppColors.errorRed
+            : AppColors.primaryBlue;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -921,13 +1115,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: (isConfirmed ? AppColors.primaryGreen : AppColors.primaryBlue)
-                  .withOpacity(0.12),
+              color: accentColor.withOpacity(0.12),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               Icons.medication_outlined,
-              color: isConfirmed ? AppColors.primaryGreen : AppColors.primaryBlue,
+              color: accentColor,
             ),
           ),
           const SizedBox(width: 12),
@@ -948,14 +1141,18 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   '${prise.heurePrevue ?? 'N/A'} · ${prise.dosage ?? 'N/A'}',
                   style: const TextStyle(fontSize: 12, color: AppColors.grey),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  _buildDoseStatusMessage(prise),
+                  style: TextStyle(fontSize: 11, color: accentColor),
+                ),
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: (isConfirmed ? AppColors.primaryGreen : AppColors.errorRed)
-                  .withOpacity(0.12),
+              color: accentColor.withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -963,7 +1160,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: isConfirmed ? AppColors.primaryGreen : AppColors.errorRed,
+                color: accentColor,
               ),
             ),
           ),
@@ -1084,14 +1281,89 @@ class _PatientDashboardState extends State<PatientDashboard> {
     );
   }
 
+<<<<<<< HEAD
+=======
+  dynamic _findPriorityPrise(List<dynamic> prises) {
+    if (prises.isEmpty) {
+      return null;
+    }
+
+    final pending = prises
+        .where(
+          (prise) =>
+              prise.statut != 'CONFIRMEE' && prise.statut != 'MANQUEE',
+        )
+        .toList();
+    if (pending.isEmpty) {
+      return null;
+    }
+
+    pending.sort((a, b) {
+      final aDate = a.heurePrevueDateTime ?? DateTime.now();
+      final bDate = b.heurePrevueDateTime ?? DateTime.now();
+      return aDate.compareTo(bDate);
+    });
+
+    final overdue = pending.where(_isOverdue).toList();
+    if (overdue.isNotEmpty) {
+      return overdue.first;
+    }
+
+    return pending.first;
+  }
+
+>>>>>>> aa86dbabf5ff427bb1e238a1def1446a9a57bc24
   Future<void> _refreshAll() async {
     final authVm = context.read<AuthViewModel>();
     final patientId = authVm.currentUser?.id;
     await context.read<ProcheViewModel>().refresh();
     if (patientId != null && patientId.isNotEmpty) {
-      await context.read<TreatmentProvider>().loadTodayPrises(patientId);
-      await context.read<TreatmentProvider>().loadAllPrises(patientId);
-      await context.read<TreatmentProvider>().loadAdherenceSummary(patientId);
+      final treatmentProvider = context.read<TreatmentProvider>();
+      await treatmentProvider.loadTodayPrises(patientId);
+      await treatmentProvider.loadAllPrises(patientId);
+      await treatmentProvider.loadAdherenceSummary(patientId);
+      await _syncScheduledDoseReminders(treatmentProvider.todayPrises);
+      _maybeShowDueDoseReminder();
+    }
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_refreshAll());
+    });
+  }
+
+  Future<void> _syncScheduledDoseReminders(List<dynamic> prises) async {
+    final preferences = await _notificationPreferencesService.load();
+    if (!preferences.remindersEnabled) {
+      return;
+    }
+
+    final now = DateTime.now();
+    for (final prise in prises) {
+      final notificationId = prise.id.hashCode;
+      if (_isConfirmedPrise(prise) || _isMissedPrise(prise)) {
+        await LocalNotificationService().cancelDoseReminder(notificationId);
+        continue;
+      }
+
+      final scheduled = prise.heurePrevueDateTime;
+      if (scheduled == null || !scheduled.isAfter(now)) {
+        continue;
+      }
+
+      await LocalNotificationService().scheduleExactDoseReminder(
+        id: notificationId,
+        scheduledAt: scheduled,
+        title: 'Prise de medicament',
+        body:
+            'Il est l\'heure de prendre ${prise.medicamentNom} (${prise.dosage ?? 'dose prescrite'}).',
+        playSound: preferences.soundEnabled,
+      );
     }
   }
 
@@ -1171,10 +1443,20 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     contentPadding: EdgeInsets.zero,
                     leading: CircleAvatar(
                       backgroundColor: AppColors.primaryGreen.withOpacity(0.12),
-                      child: Text(_avatarLabel(proche)),
+                      backgroundImage: _extractBase64(proche.photoBase64) == null
+                          ? null
+                          : MemoryImage(base64Decode(_extractBase64(proche.photoBase64)!)),
+                      child: _extractBase64(proche.photoBase64) == null
+                          ? Text(_avatarLabel(proche))
+                          : null,
                     ),
                     title: Text(proche.fullName),
-                    subtitle: Text(proche.relation ?? 'Proche'),
+                    subtitle: Text(
+                      [
+                        proche.relation ?? 'Proche',
+                        if ((proche.status ?? '').isNotEmpty) proche.status!,
+                      ].join(' • '),
+                    ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.pop(ctx);
@@ -1206,4 +1488,116 @@ class _PatientDashboardState extends State<PatientDashboard> {
       },
     );
   }
+
+  bool _isOverdueByThirtyMinutes(dynamic prise) {
+    final scheduled = prise.heurePrevueDateTime;
+    if (scheduled == null || prise.statut == 'CONFIRMEE') {
+      return false;
+    }
+    return DateTime.now().isAfter(scheduled.add(const Duration(minutes: 30)));
+  }
+
+  bool _isOverdue(dynamic prise) {
+    final scheduled = prise.heurePrevueDateTime;
+    if (scheduled == null || prise.statut == 'CONFIRMEE') {
+      return false;
+    }
+    return DateTime.now().isAfter(scheduled);
+  }
+
+  bool _isDueSoon(dynamic prise) {
+    final scheduled = prise.heurePrevueDateTime;
+    if (scheduled == null || prise.statut == 'CONFIRMEE') {
+      return false;
+    }
+    final now = DateTime.now();
+    return scheduled.isBefore(now.add(const Duration(minutes: 5))) &&
+        scheduled.isAfter(now.subtract(const Duration(minutes: 10)));
+  }
+
+  String _formatScheduleLabel(DateTime? scheduled) {
+    if (scheduled == null) {
+      return 'Heure inconnue';
+    }
+
+    final hh = scheduled.hour.toString().padLeft(2, '0');
+    final mm = scheduled.minute.toString().padLeft(2, '0');
+    final now = DateTime.now();
+
+    if (_isSameDay(now, scheduled)) {
+      return '$hh:$mm aujourd\'hui';
+    }
+
+    final day = scheduled.day.toString().padLeft(2, '0');
+    final month = scheduled.month.toString().padLeft(2, '0');
+    return '$hh:$mm le $day/$month';
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  void _maybeShowDueDoseReminder() {
+    final due = _findPriorityPrise(context.read<TreatmentProvider>().todayPrises);
+    if (due == null) {
+      return;
+    }
+    final shouldRemind = _isOverdue(due) || _isDueSoon(due);
+    if (!shouldRemind) {
+      return;
+    }
+    unawaited(_triggerDoseReminder(due));
+  }
+
+  Future<void> _triggerDoseReminder(dynamic due) async {
+    final preferences = await _notificationPreferencesService.load();
+    if (!preferences.remindersEnabled) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final minimumGap = preferences.repeatEveryMinuteUntilConfirmed
+        ? const Duration(minutes: 1)
+        : const Duration(minutes: 30);
+
+    if (_lastReminderPriseId == due.id &&
+        _lastReminderShownAt != null &&
+        now.difference(_lastReminderShownAt!) < minimumGap) {
+      return;
+    }
+
+    _lastReminderPriseId = due.id;
+    _lastReminderShownAt = now;
+
+    final title = _isOverdue(due) ? 'Rappel urgent de prise' : 'Rappel de prise';
+
+    final body =
+        'Prenez ${due.medicamentNom} (${due.dosage ?? 'dose prescrite'}) puis confirmez la prise dans PharmaCare.';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$title: ${due.medicamentNom} a ${_formatScheduleLabel(due.heurePrevueDateTime)}.',
+        ),
+        backgroundColor:
+            _isOverdue(due) ? AppColors.errorRed : AppColors.primaryBlue,
+        duration: const Duration(seconds: 6),
+      ),
+    );
+
+    await LocalNotificationService().showDoseReminder(
+      id: due.id.hashCode,
+      title: title,
+      body: body,
+      playSound: preferences.soundEnabled,
+    );
+  }
+
+  String? _extractBase64(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+    return raw.contains(',') ? raw.split(',').last : raw;
+  }
 }
+

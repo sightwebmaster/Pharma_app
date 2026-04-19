@@ -14,6 +14,30 @@ class TreatmentService {
   final Dio _dio = ApiClient().dio;
   final Logger log = Logger();
 
+  String _extractErrorMessage(
+    DioException error,
+    String fallback,
+  ) {
+    final data = error.response?.data;
+
+    if (data is Map<String, dynamic>) {
+      final message =
+          data['message'] ??
+          data['error'] ??
+          data['details'] ??
+          data['path'];
+      if (message is String && message.trim().isNotEmpty) {
+        return message;
+      }
+    }
+
+    if (data is String && data.trim().isNotEmpty) {
+      return data;
+    }
+
+    return error.message ?? fallback;
+  }
+
   Future<ApiResponse<List<PrisePlanifiee>>> getTodayPrises(
     String patientId,
     String token,
@@ -46,7 +70,7 @@ class TreatmentService {
       return ApiResponse.error(message: 'Format invalide', statusCode: response.statusCode);
     } on DioException catch (e) {
       return ApiResponse.error(
-        message: e.message ?? 'Erreur chargement prises',
+        message: _extractErrorMessage(e, 'Erreur chargement prises'),
         statusCode: e.response?.statusCode,
         error: e,
       );
@@ -83,7 +107,7 @@ class TreatmentService {
       );
     } on DioException catch (e) {
       return ApiResponse.error(
-        message: e.message ?? 'Erreur chargement prises',
+        message: _extractErrorMessage(e, 'Erreur chargement prises'),
         statusCode: e.response?.statusCode,
         error: e,
       );
@@ -113,7 +137,7 @@ class TreatmentService {
       );
     } on DioException catch (e) {
       return ApiResponse.error(
-        message: e.message ?? 'Erreur confirmation prise',
+        message: _extractErrorMessage(e, 'Erreur confirmation prise'),
         statusCode: e.response?.statusCode,
         error: e,
       );
@@ -145,7 +169,7 @@ class TreatmentService {
       );
     } on DioException catch (e) {
       return ApiResponse.error(
-        message: e.message ?? 'Erreur création traitement',
+        message: _extractErrorMessage(e, 'Erreur création traitement'),
         statusCode: e.response?.statusCode,
         error: e,
       );
@@ -175,7 +199,7 @@ class TreatmentService {
       );
     } on DioException catch (e) {
       return ApiResponse.error(
-        message: e.message ?? 'Erreur chargement rapport',
+        message: _extractErrorMessage(e, 'Erreur chargement rapport'),
         statusCode: e.response?.statusCode,
         error: e,
       );

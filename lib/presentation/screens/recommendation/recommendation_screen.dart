@@ -621,40 +621,139 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   }
 
   Widget _buildHistoryItem(RecommendationModel item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.primaryDisease,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+    return InkWell(
+      onTap: () => _showHistoryDetails(item),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.primaryDisease,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
-              ),
-              _buildStatusBadge(item.status),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            item.symptoms,
-            style: const TextStyle(color: AppColors.grey),
-          ),
-          if (item.createdAt != null) ...[
+                _buildStatusBadge(item.status),
+              ],
+            ),
             const SizedBox(height: 6),
             Text(
-              item.createdAt!.toLocal().toString(),
-              style: const TextStyle(fontSize: 12, color: AppColors.grey),
+              item.symptoms,
+              style: const TextStyle(color: AppColors.grey),
+            ),
+            if (item.createdAt != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                item.createdAt!.toLocal().toString(),
+                style: const TextStyle(fontSize: 12, color: AppColors.grey),
+              ),
+            ],
+            const SizedBox(height: 8),
+            const Text(
+              'Touchez pour voir les medicaments recommandes',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.primaryBlue,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
-        ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showHistoryDetails(RecommendationModel item) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  item.primaryDisease,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  item.symptoms,
+                  style: const TextStyle(color: AppColors.grey, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Medicaments recommandes',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                if (item.recommendedMedications.isEmpty)
+                  const Text(
+                    'Aucun medicament detaille pour ce cas.',
+                    style: TextStyle(color: AppColors.grey),
+                  )
+                else
+                  ...item.recommendedMedications.map(
+                    (medication) => Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF7FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            medication.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            [
+                              if ((medication.dosage ?? '').isNotEmpty) medication.dosage!,
+                              if ((medication.frequency ?? '').isNotEmpty) medication.frequency!,
+                              if (medication.priceTnd != null)
+                                '${medication.priceTnd!.toStringAsFixed(2)} TND',
+                            ].join(' • '),
+                            style: const TextStyle(color: AppColors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -783,9 +882,14 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         isPregnant: _targetPatient!.enceinte ?? false,
         initialMedicationName: selectedMedication.name,
         initialDosage: selectedMedication.dosage ?? selectedMedication.frequency,
-        initialType: selectedMedication.dci,
+        initialType: selectedMedication.frequency,
         recommendationNote: _noteController.text.trim().isEmpty
-            ? selectedMedication.contraindications.join(' ; ')
+            ? [
+                if (selectedMedication.description?.isNotEmpty == true)
+                  selectedMedication.description!,
+                if (selectedMedication.contraindications.isNotEmpty)
+                  'Contre-indications: ${selectedMedication.contraindications.join(', ')}',
+              ].join(' | ')
             : _noteController.text.trim(),
       );
     }
