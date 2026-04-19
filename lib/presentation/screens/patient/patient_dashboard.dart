@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pharma_app/core/constants/app_colors.dart';
+import 'package:pharma_app/core/constants/app_text_styles.dart';
 import 'package:pharma_app/core/routes/app_routes.dart';
 import 'package:pharma_app/data/models/proche_model.dart';
 import 'package:pharma_app/presentation/screens/patient/profile_setting_screen.dart';
@@ -10,6 +11,7 @@ import 'package:pharma_app/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/proche_viewmodel.dart';
 import 'package:pharma_app/presentation/widgets/add_proche_dialog_widget.dart';
 import 'package:pharma_app/presentation/widgets/common/user_avatar.dart';
+import 'package:pharma_app/presentation/widgets/pharma_bottom_nav.dart';
 import 'package:pharma_app/presentation/widgets/week_calendar_widget.dart';
 import 'package:pharma_app/services/treatment_provider.dart';
 
@@ -44,7 +46,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
@@ -62,32 +64,120 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   Widget _buildBottomNav() {
-    const items = [
-      (Icons.home_filled, 'Accueil'),
-      (Icons.calendar_month_outlined, 'Planning'),
-      (Icons.assignment_outlined, 'Historique'),
-      (Icons.notifications_outlined, 'Alertes'),
-      (Icons.person_outline, 'Profil'),
-    ];
-
-    return BottomNavigationBar(
+    return PharmaBottomNav(
       currentIndex: _selectedIndex,
-      onTap: (index) => setState(() => _selectedIndex = index),
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: AppColors.primaryGreen,
-      unselectedItemColor: AppColors.grey,
-      backgroundColor: Colors.white,
-      elevation: 10,
-      selectedFontSize: 11,
-      unselectedFontSize: 11,
-      items: items
-          .map(
-            (item) => BottomNavigationBarItem(
-              icon: Icon(item.$1),
-              label: item.$2,
+      onTap: (i) => setState(() => _selectedIndex = i),
+      items: const [
+        PharmaNavItem(icon: Icons.home_outlined,         activeIcon: Icons.home_rounded,             label: 'Accueil'),
+        PharmaNavItem(icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month_rounded, label: 'Planning'),
+        PharmaNavItem(icon: Icons.assignment_outlined,   activeIcon: Icons.assignment_rounded,        label: 'Historique'),
+        PharmaNavItem(icon: Icons.notifications_outlined, activeIcon: Icons.notifications_rounded,   label: 'Alertes'),
+        PharmaNavItem(icon: Icons.person_outline,        activeIcon: Icons.person_rounded,            label: 'Profil'),
+      ],
+    );
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  String _todayLabel() {
+    const days = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+    const months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    final now = DateTime.now();
+    return '${days[now.weekday - 1]} ${now.day} ${months[now.month - 1]}';
+  }
+
+  Widget _buildHeroRingCard(TreatmentProvider treatmentProvider) {
+    final total     = treatmentProvider.todayPrises.length;
+    final confirmed = treatmentProvider.todayPrises.where((p) => p.statut == 'CONFIRMEE').length;
+    final ratio     = total == 0 ? 0.0 : confirmed / total;
+    final next      = treatmentProvider.todayPrises
+        .where((p) => p.statut == 'PLANIFIEE' && p.heurePrevueDateTime != null)
+        .toList()
+      ..sort((a, b) => a.heurePrevueDateTime!.compareTo(b.heurePrevueDateTime!));
+    final nextTime  = next.isEmpty ? null : next.first.heurePrevueDateTime;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: AppColors.greenGradient,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(color: Color(0x3312B8A0), blurRadius: 20, offset: Offset(0, 8)),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Decorative blob
+          Positioned(
+            right: -20, bottom: -20,
+            child: Container(
+              width: 120, height: 120,
+              decoration: const BoxDecoration(
+                color: Color(0x10FFFFFF), shape: BoxShape.circle),
             ),
-          )
-          .toList(),
+          ),
+          Row(
+            children: [
+              // Progress ring
+              SizedBox(
+                width: 72, height: 72,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 72, height: 72,
+                      child: CircularProgressIndicator(
+                        value: ratio,
+                        strokeWidth: 7,
+                        backgroundColor: Colors.white.withValues(alpha: 0.3),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        strokeCap: StrokeCap.round,
+                      ),
+                    ),
+                    Text(
+                      '$confirmed/$total',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Prises du jour',
+                      style: TextStyle(color: Colors.white70, fontSize: 12.5),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$confirmed prise${confirmed > 1 ? 's' : ''} sur $total',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                      ),
+                    ),
+                    if (nextTime != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Prochaine à ${nextTime.hour.toString().padLeft(2,'0')}h${nextTime.minute.toString().padLeft(2,'0')}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -96,7 +186,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
     final treatmentProvider = context.watch<TreatmentProvider>();
     final prochesVm = context.watch<ProcheViewModel>();
     final user = authVm.currentUser;
-    final nextPrise = _findNextPrise(treatmentProvider.todayPrises);
 
     return RefreshIndicator(
       color: AppColors.primaryGreen,
@@ -104,53 +193,55 @@ class _PatientDashboardState extends State<PatientDashboard> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.primaryGreen, Color(0xFF00C9B4)],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // ── Top greeting (no gradient — design uses plain top + hero card) ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Bonjour',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user?.fullName.isNotEmpty == true
-                              ? user!.fullName
-                              : 'Patient',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      _todayLabel(),
+                      style: AppTextStyles.bodyMedium,
                     ),
-                    UserAvatar(
-                      user: user,
-                      radius: 26,
-                      backgroundColor: Colors.white24,
+                    const SizedBox(height: 2),
+                    Text(
+                      'Bonjour, ${user?.fullName.split(' ').first ?? 'Patient'}',
+                      style: AppTextStyles.headline2,
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                _buildNextDoseCard(nextPrise),
+                Stack(
+                  children: [
+                    UserAvatar(user: user, radius: 21, backgroundColor: AppColors.greenSoft),
+                    if (treatmentProvider.todayPrises.any((p) => p.statut == 'PLANIFIEE'))
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: AppColors.warnFg,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.background, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          // ── Hero ring card (green gradient) ─────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildHeroRingCard(treatmentProvider),
+          ),
+          const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -991,15 +1082,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
         ],
       ),
     );
-  }
-
-  dynamic _findNextPrise(List<dynamic> prises) {
-    for (final prise in prises) {
-      if (prise.statut != 'CONFIRMEE') {
-        return prise;
-      }
-    }
-    return null;
   }
 
   Future<void> _refreshAll() async {

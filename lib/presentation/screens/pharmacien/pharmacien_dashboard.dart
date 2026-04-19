@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:pharma_app/core/constants/app_colors.dart';
 import 'package:pharma_app/core/routes/app_routes.dart';
+import 'package:pharma_app/presentation/widgets/pharma_bottom_nav.dart';
 import 'package:pharma_app/presentation/screens/recommendation/recommendation_screen.dart';
 import 'package:pharma_app/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/pharmacien_viewmodel.dart';
@@ -43,7 +44,7 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
@@ -61,33 +62,16 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
   }
 
   Widget _buildBottomNav() {
-    const items = [
-      (Icons.home_filled, 'Accueil'),
-      (Icons.qr_code_scanner, 'Scanner'),
-      (Icons.people_outline, 'Patients'),
-      (Icons.assignment_outlined, 'Soins'),
-      (Icons.person_outline, 'Profil'),
-    ];
-
-    return BottomNavigationBar(
+    return PharmaBottomNav(
       currentIndex: _selectedIndex,
-      onTap: (index) => setState(() => _selectedIndex = index),
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: AppColors.primaryBlue,
-      unselectedItemColor: AppColors.grey,
-      backgroundColor: Colors.white,
-      elevation: 10,
-      selectedFontSize: 10,
-      unselectedFontSize: 10,
-      iconSize: 22,
-      items: items
-          .map(
-            (item) => BottomNavigationBarItem(
-              icon: Icon(item.$1),
-              label: item.$2,
-            ),
-          )
-          .toList(),
+      onTap: (i) => setState(() => _selectedIndex = i),
+      items: const [
+        PharmaNavItem(icon: Icons.home_outlined,      activeIcon: Icons.home_rounded,             label: 'Accueil'),
+        PharmaNavItem(icon: Icons.qr_code_scanner,    activeIcon: Icons.qr_code_scanner,          label: 'Scanner'),
+        PharmaNavItem(icon: Icons.people_outline,     activeIcon: Icons.people_rounded,           label: 'Patients'),
+        PharmaNavItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded,       label: 'Soins'),
+        PharmaNavItem(icon: Icons.person_outline,     activeIcon: Icons.person_rounded,           label: 'Profil'),
+      ],
     );
   }
 
@@ -505,12 +489,12 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
     final user = profileUser ?? context.watch<AuthViewModel>().currentUser;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primaryBlue, Color(0xFF6580F5)],
+        gradient: AppColors.pharmacienGradient,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
         ),
       ),
       child: Row(
@@ -552,11 +536,12 @@ class _PharmacienDashboardState extends State<PharmacienDashboard> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.16),
+            color: color.withValues(alpha: 0.10),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

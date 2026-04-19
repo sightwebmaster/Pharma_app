@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:pharma_app/presentation/viewmodels/medication_viewmodel.dart';
+// import 'package:flutter/foundation.dart';
+//import 'package:pharma_app/presentation/viewmodels/medication_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/pharmacien_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/proche_viewmodel.dart';
 import 'package:pharma_app/presentation/viewmodels/recommendation_viewmodel.dart';
@@ -20,9 +19,9 @@ void main() async {
   // Assurer l'initialisation de Flutter
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (!kIsWeb) {
-    await Firebase.initializeApp();
-  }
+  // if (!kIsWeb) {
+  //   await Firebase.initializeApp();
+  // }
 
   // Initialiser les services
   await StorageService().init();
@@ -41,7 +40,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => AuthViewModel()..checkAuthStatus(),
         ),
-        ChangeNotifierProvider(create: (_) => MedicationViewModel()),
+        // ChangeNotifierProvider(create: (_) => MedicationViewModel()),
         ChangeNotifierProvider(create: (_) => PharmacienViewModel()),
         ChangeNotifierProvider(create: (_) => ProcheViewModel()),
         ChangeNotifierProvider(create: (_) => AddProcheViewModel()),
